@@ -1,0 +1,29 @@
+# --- Python Basics ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual Environments (Massive folders we don't need on Git) ---
+venv/
+env/
+.venv/
+
+# --- Environment Variables (CRITICAL SECURITY) ---
+.env
+.env.local
+
+# --- IDE Settings (VS Code / PyCharm) ---
+.vscode/
+.idea/
+
+# --- Database ---
+*.sqlite3
+*.db
+
+# --- Logs ---
+*.log
+celerybeat-schedule
+
+# --- OS Junk ---
+.DS_Store
+Thumbs.db
