@@ -2,18 +2,19 @@
 # Session -> A temporary workspace for a single request, When a user asks for data, we open a session.
 # When the request is done, we closw it
 
-from sqlmodel import create_engine, Session, SQLModel
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from app.core.config import settings
 
 
-engine = create_engine(settings.DATABASE_URL)
+engine = create_async_engine(settings.POSTGRES_URL, echo=True)
+# echo = True -> o/p shown on our terminal
 
 
-def get_session():
-    #our db session after yield it closes
-    with Session(engine) as session:
-        yield session
+LocalAsyncSession = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
-def init_db():
-    SQLModel.metadata.create_all(engine)
+async def get_session():
+    async with LocalAsyncSession() as session:
+        yield session  # yeilds an async db session for us to use
