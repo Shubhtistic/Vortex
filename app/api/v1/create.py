@@ -1,16 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from app.schemas.event import CreateEvent
-from app.models.event_table import Event
-from app.db.session import get_session
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.tasks import process_event_task
 
 router = APIRouter()
 
 
-@router.post("/track")
-async def track_new_event(
-    event_in: CreateEvent, session: AsyncSession = Depends(get_session)
-):
+@router.post(
+    "/track", status_code=202
+)  # 202 means its accepted , we will work on it later
+async def track_new_event(event_in: CreateEvent):
     """
     Docstring for track_new_event
 
@@ -25,12 +24,11 @@ async def track_new_event(
     # Postgres cannot store the Pydantic 'HttpUrl' object directly.
     data["url"] = str(data["url"])
 
-    event_db = Event(**data)
-    # ** means unpack a dictionary into keywrd arguments
-    # **dict  →  spread the dict into arguments
+    # .delay() means "Put this in Redis and don't wait for the answer"
+    task = process_event_task.delay(data)
 
-    session.add(event_db)
-    await session.commit()
-    await session.refresh(event_db)
-
-    return {"status": "saved", "event_id": event_db.id, "timestamp": event_db.timestamp}
+    return {
+        "status": "queued",
+        "task_id": task.id,
+        "message": "Event received and is being processed in background",
+    }
