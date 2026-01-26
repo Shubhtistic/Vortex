@@ -15,5 +15,5 @@ async def return_number(session: AsyncSession = Depends(get_session)):
         Event
     )  # sql query (Select count(*) from event; )
 
-    count = await session.exec(s).one()
+    count = (await session.execute(s)).scalar_one()
     return {" status": "Success", "Total Count": count}
