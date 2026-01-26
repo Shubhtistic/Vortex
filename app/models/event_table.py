@@ -1,5 +1,6 @@
 from sqlmodel import SQLModel, Field, JSON
 from typing import Optional, Dict, Any
+from sqlalchemy import Column, DateTime
 from datetime import datetime, timezone
 import uuid
 
@@ -20,4 +21,9 @@ class Event(SQLModel, table=True):
     payload: Optional[Dict[str, Any]] = Field(default={}, sa_type=JSON)
 
     # 5. Timestamp: When did we save this?
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    # # sa_column tells sqlodel to use a specific SQLAlchemy column type
+    # DateTime(timezone=True) creates a 'TIMESTAMPTZ' column in Postgres
