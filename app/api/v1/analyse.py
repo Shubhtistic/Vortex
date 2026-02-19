@@ -1,16 +1,14 @@
-from app.db.session import get_session
 from sqlmodel import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends
 
 from fastapi import APIRouter
-from app.models.event_table import Event
+from app.db.event_table import Event
+from app.dependancies.db_dependancy import DbSessionDep
 
 router = APIRouter()
 
 
 @router.get("/stats")
-async def return_number(session: AsyncSession = Depends(get_session)):
+async def return_number(session: DbSessionDep):
     s = select(func.count()).select_from(
         Event
     )  # sql query (Select count(*) from event; )
