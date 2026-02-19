@@ -4,12 +4,17 @@ from app.core.config import settings
 celery_app = Celery(
     "Vortex_worker",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    # backend=settings.REDIS_URL,
     include=["app.tasks"],
 )
 # broker -> Where to pick up tasks (Redis)
+
 # backend -> Where to store results (Redis)
-# Vortex_worker our celery app name , can be anything
+# We have removed the backend field as it stores results of tasks. but we do not retrieve it
+# now
+# redis only stores pending tasks
+# no result storage , less memory usage and less Redis pressure
+# for high-volume telemetry, this is better
 
 
 # configure/updte settings for celery
