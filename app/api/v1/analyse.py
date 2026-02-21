@@ -1,7 +1,7 @@
 from sqlmodel import func, select
 
 from fastapi import APIRouter
-from app.db.event_table import Event
+from app.db.db_models import Event
 from app.dependancies.db_dependancy import DbSessionDep
 
 router = APIRouter()
