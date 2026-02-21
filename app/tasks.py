@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
-from app.models.event_table import Event
+from app.db.db_models import Event
 
 # Null Pool Concept
 # We create a special engine just for the worker using NullPool.
