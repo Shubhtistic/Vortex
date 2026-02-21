@@ -1,16 +1,17 @@
 from fastapi import FastAPI
 from scalar_fastapi import get_scalar_api_reference
 from contextlib import asynccontextmanager
+from app.db.session import engine
+
+
+# routers
 from app.api.v1 import create
-from app.db.session import init_db
+from app.api.v1 import analyse
 
 
 # this runs before app receives request
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Creating db tables..")
-    init_db()
-    print("db tables created")
     yield
 
 
@@ -19,11 +20,12 @@ app = FastAPI(title="Vortex Telemetry Engine", lifespan=lifespan)
 
 
 app.include_router(create.router, prefix="/api/v1")
+app.include_router(analyse.router, prefix="/api/v1")
 
 
 @app.get("/")
 def health():
-    # FastAPI automatically converts this Dictionary to JSON.
+    # fastapi will convert this dict into json automatically
     return {"status": "active", "system": "Vortex API"}
 
 
