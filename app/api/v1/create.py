@@ -1,28 +1,26 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.schemas.event import CreateEvent
 
 from app.tasks import process_event_task
+from app.dependancies.security import PublishableKeyDep
+from app.dependancies.rate_limiter import check_limit
 
 router = APIRouter()
 
 
 @router.post(
-    "/track", status_code=202
+    "/track", status_code=202, dependencies=[Depends(check_limit)]
 )  # 202 means its accepted , we will work on it later
-async def track_new_event(event_in: CreateEvent):
-    """
-    Docstring for track_new_event
-
-    :param event_in: new event to be added in database
-    :type event_in: CreateEvent
-    :param session: db session to perform operations
-    :type session: AsyncSession
-    """
+async def track_new_event(event_in: CreateEvent, api_key: PublishableKeyDep):
+    """takes a new event and gives it to celery"""
     # Convert Schema -> Dictionary
     data = event_in.model_dump()
 
     # Postgres cannot store the Pydantic 'HttpUrl' object directly.
     data["url"] = str(data["url"])
+
+    # add the tenant id
+    data["tenant_id"] = api_key.tenant_id
 
     # .delay() means "Put this in Redis and don't wait for the answer"
     task = process_event_task.delay(data)
