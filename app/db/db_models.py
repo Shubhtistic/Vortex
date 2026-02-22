@@ -46,7 +46,7 @@ class Event(SQLModel, table=True):
     event_type: str
 
     # sa_type=JSON is required to tell the database this is json object
-    payload: Optional[Dict[str, Any]] = Field(default={}, sa_type=JSON)
+    payload: Optional[Dict[str, Any]] = Field(default_factory=dict, sa_type=JSON)
 
     # Timestamp: When did we save this?
     timestamp: datetime = Field(
