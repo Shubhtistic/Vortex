@@ -3,7 +3,8 @@ from sqlmodel import SQLModel, Field, JSON
 from typing import Optional, Dict, Any
 from sqlalchemy import Column, DateTime
 from datetime import datetime, timezone
-import uuid
+from uuid import UUID
+from uuid_utils import uuid7
 
 
 class KeyType(str, Enum):
@@ -15,7 +16,7 @@ class ApiKey(SQLModel, table=True):
     __tablename__ = "api_keys"
 
     # unique id
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    id: UUID = Field(default_factory=uuid7, primary_key=True)
 
     # The string that logically links this key to the events
     tenant_id: str = Field(index=True)
@@ -35,7 +36,7 @@ class ApiKey(SQLModel, table=True):
 class Event(SQLModel, table=True):
     __tablename__ = "events"
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    id: UUID = Field(default_factory=uuid7, primary_key=True)
 
     # This is how we know whose event this is. It logically matches ApiKey.tenant_id
     tenant_id: str = Field(index=True)
