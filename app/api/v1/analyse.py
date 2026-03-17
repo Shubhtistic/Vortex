@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlmodel import func, select, desc
@@ -27,15 +28,20 @@ async def return_number(
 
 
 @router.get("/top-urls")
-async def top_urls(db: DbSessionDep, api_key: SecretKeyDep):
+async def top_urls(
+    db: DbSessionDep, api_key: SecretKeyDep, days_ago: int = 3, top: int = 5
+):
     """Returns top 5 most visted urls for a tenant"""
 
+    # days_ago -> a time duration for the data -> last 60 days (2 month approax), last 5 days, etc
+    qry_date = datetime.now(timezone.utc) - timedelta(days=days_ago)
     query = (
         select(Event.url, func.count(Event.id).label("visits"))
         .where(Event.tenant_id == api_key.tenant_id)
+        .where(Event.timestamp > qry_date)
         .group_by(Event.url)
         .order_by(desc("visits"))
-        .limit(5)
+        .limit(top)
     )
     res = await db.execute(query)
 
@@ -48,16 +54,21 @@ async def top_urls(db: DbSessionDep, api_key: SecretKeyDep):
 
 
 @router.get("/events-per-day")
-async def events_per_day(db: DbSessionDep, api_key: SecretKeyDep):
+async def events_per_day(db: DbSessionDep, api_key: SecretKeyDep, from_days: int = 7):
     """Returns the number of events per day for a time-series chart."""
+
+    qry_date = datetime.now(timezone.utc) - timedelta(days=from_days)
 
     date_column = func.date(Event.timestamp).label("event_date")
 
     query = (
         select(date_column, func.count(Event.id).label("visits"))
         .where(Event.tenant_id == api_key.tenant_id)
+        .where(Event.timestamp > qry_date)  # Filter out old data FIRST
         .group_by(date_column)
         .order_by(date_column)
+        # We removed .limit() because if we filter the last 7 days,
+        # we naturally get a maximum of 7 groups back!
     )
 
     res = await db.execute(query)
