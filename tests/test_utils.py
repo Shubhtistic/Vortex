@@ -25,3 +25,19 @@ def test_hash_key_function():
     assert len(first_hash)==64
 
     assert first_hash==second_hash
+
+
+from app.utils.hash import hash_api_key
+
+
+def test_hash_key_uniqueness():
+    # step 1 -> Arrange
+    key_one = "vtx_pub_AAAAA"
+    key_two = "vtx_pub_BBBBB"
+    
+    # step 2 -> Act
+    hash_one = hash_api_key(key_one)
+    hash_two = hash_api_key(key_two)
+    
+    # step 3 -> Assert
+    assert hash_one != hash_two
