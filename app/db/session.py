@@ -17,4 +17,9 @@ LocalAsyncSession = async_sessionmaker(
 
 async def get_session():
     async with LocalAsyncSession() as session:
-        yield session  # yeilds an async db session for us to use
+        yield session  # yields an async db session for us to use
+
+# by using the yield keyword this becomes a generator function
+# This returns an async generator object
+# which yields: session
+# so we get an session object
