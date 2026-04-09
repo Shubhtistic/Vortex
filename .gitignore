@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+seed.py
 
 # --- Virtual Environments (Massive folders we don't need on Git) ---
 venv/
