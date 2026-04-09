@@ -4,7 +4,6 @@
 # we have force/teach celery on how to work in async manner
 
 import asyncio
-
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -40,9 +39,20 @@ async def save_event_to_db(data: dict):
 # @celery_app.task turns this into a job that redis can triger
 @celery_app.task
 def process_event_task(event_data: dict):
-    print(f"received dataa: {event_data.get('url')}")
+    try:
+        # Step 1: Try to find an already running event loop (Pytest Eager Mode)
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
 
-    # selery is sync, but our DB code is ssync
-    # asyncio.run() allows celery to execute the assync function
-    result = asyncio.run(save_event_to_db(event_data))
-    return result
+    if loop and loop.is_running():
+        # Step 2: Test Environment
+        # A loop is already running! We schedule the DB write in the background 
+        # instead of trying to force a new loop to start.
+        loop.create_task(save_event_to_db(event_data))
+        return "queued in existing loop"
+    else:
+        # Step 3: Production Environment
+        # The Celery worker thread has no loop. We safely create one 
+        # and run the database function synchronously.
+        return asyncio.run(save_event_to_db(event_data))
