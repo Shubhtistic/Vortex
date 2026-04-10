@@ -24,7 +24,7 @@ async def return_number(
 
     count = (await session.execute(statement)).scalar_one()
 
-    return {"status": "Success", "tenant": api_key.tenant_id, "Total Count": count}
+    return {"status": "Success", "tenant": api_key.tenant_id, "Total_Count": count}
 
 
 @router.get("/top-urls")
