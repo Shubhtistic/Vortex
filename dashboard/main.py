@@ -11,7 +11,6 @@ st.set_page_config(page_title="Vortex Analytics", layout="wide")
 st.title("Vortex Telemetry Engine")
 st.caption("Premium telemetry analytics for your workspace")
 
-# Clean CSS to hide default Streamlit menus, letting native containers handle the rest
 hide_streamlit_style = """
 <style>
     #MainMenu {visibility: hidden;}
@@ -40,7 +39,7 @@ with st.sidebar:
                 if input_key:
                     with st.spinner("Verifying Key..."):
                         try:
-                            # Explicitly hit the verify endpoint first
+                            #hit the verify endpoint first
                             verify_res = hx.get(
                                 f"{API_BASE_URL}/verify", 
                                 headers={"X-API-Key": input_key}, 
@@ -48,14 +47,13 @@ with st.sidebar:
                             )
                             
                             if verify_res.status_code == 401:
-                                # Clean slate: Wipe everything and ask again
                                 st.session_state.authenticated = False
                                 st.session_state.secret_key = ""
                                 st.error("Invalid API Key. Please try again.")
                                 st.stop()
 
                             if verify_res.status_code == 200:
-                                # Key is valid! Unlock the dashboard.
+                                # Key is valid go to dashboard.
                                 st.session_state.authenticated = True
                                 st.session_state.secret_key = input_key
                                 st.rerun()
@@ -90,7 +88,6 @@ current_page = st.sidebar.radio(
     ["Overview", "Traffic Trends", "Top URLs"]
 )
 
-# CONDITIONAL FILTERS: Only show the "Filters" section if we are NOT on the Overview page
 if current_page != "Overview":
     st.sidebar.divider()
     st.sidebar.header("Filters")
@@ -151,7 +148,6 @@ with st.spinner("Fetching Live Data"):
         st.error("Critical Error, Cant Connect To Api")
         st.stop()
 
-# Native Streamlit columns and containers for a sleek metric layout
 metric_cols = st.columns(2)
 
 with metric_cols[0]:
@@ -201,8 +197,6 @@ elif current_page == "Traffic Trends":
                     markers=True
                 )
                 
-                # AESTHETIC UPDATES FOR LINE CHART
-                # Thicker lines, no hardcoded colors (adapts to theme), subtle Y-axis grid
                 fig.update_traces(line=dict(width=3), marker=dict(size=8))
                 fig.update_layout(
                     plot_bgcolor="rgba(0,0,0,0)",
@@ -212,13 +206,11 @@ elif current_page == "Traffic Trends":
                     margin=dict(l=0, r=0, t=20, b=0)
                 )
                 
-                # THE SMART THRESHOLD: Forces category if 14 days or less to hide empty hours
-                if len(df) <= 14:
+                if len(df) <= 6:
                     fig.update_xaxes(type='category')
 
                 # now use streamlit to display the chart on screen
-                # theme="streamlit" is default, making it match dark/light mode automatically
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
             else:
                 # if there is no data
                 st.info(f"No traffic data found for the last {days_filter} days.")
@@ -251,7 +243,6 @@ elif current_page == "Top URLs":
                     color_continuous_scale="Viridis" # Professional color scale
                 )
                 
-                # AESTHETIC UPDATES FOR BAR CHART
                 fig.update_layout(
                     plot_bgcolor="rgba(0,0,0,0)",
                     paper_bgcolor="rgba(0,0,0,0)",
@@ -259,10 +250,9 @@ elif current_page == "Top URLs":
                     yaxis=dict(showgrid=False),
                     margin=dict(l=0, r=0, t=20, b=0)
                 )
-                # Note: The line disabling the color scale has been removed to restore the legend.
                 
             # use streamlit to render chart
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
                 
             else:
                 st.info(f"No URLs found for the last {days_filter} days.")
