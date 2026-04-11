@@ -10,6 +10,12 @@ from app.dependancies.security import SecretKeyDep
 
 router = APIRouter()
 
+@router.get("/verify")
+async def verify_auth(api_key: SecretKeyDep):
+    """
+    Dedicated endpoint for the frontend to verify a Secret Key during login.
+    """
+    return {"status": "success", "tenant": api_key.tenant_id}
 
 @router.get("/stats")
 async def return_number(

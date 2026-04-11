@@ -38,9 +38,9 @@ async def verify_api_key(
 
     # if redis failed we have to do normal db lookup
 
-    statement = select(ApiKey).where(ApiKey.hashed_key == incoming_hash)
+    statement = select(ApiKey.tenant_id,ApiKey.key_type, ApiKey.is_active).where(ApiKey.hashed_key == incoming_hash)
 
-    db_key = (await session.execute(statement)).scalar_one_or_none()
+    db_key = (await session.execute(statement)).one_or_none()
 
     if not db_key or not db_key.is_active:
         raise HTTPException(
