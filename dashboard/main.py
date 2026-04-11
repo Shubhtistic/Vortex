@@ -4,10 +4,14 @@ import time
 import pandas as pd
 import plotly.express as px
 
-API_BASE_URL="http://localhost:8000/api/v1"
+API_BASE_URL=st.secrets["API_BASE_URL"]
 # page setup
 st.set_page_config(page_title="Vortex Analytics", layout="wide")
 
+st.title("Vortex Telemetry Engine")
+st.caption("Premium telemetry analytics for your workspace")
+
+# Clean CSS to hide default Streamlit menus, letting native containers handle the rest
 hide_streamlit_style = """
 <style>
     #MainMenu {visibility: hidden;}
@@ -34,20 +38,45 @@ with st.sidebar:
 
             if submit_button:
                 if input_key:
-                    st.session_state.authenticated=True
-                    st.session_state.secret_key=input_key
-                    st.rerun()
+                    with st.spinner("Verifying Key..."):
+                        try:
+                            # Explicitly hit the verify endpoint first
+                            verify_res = hx.get(
+                                f"{API_BASE_URL}/verify", 
+                                headers={"X-API-Key": input_key}, 
+                                timeout=3.0
+                            )
+                            
+                            if verify_res.status_code == 401:
+                                # Clean slate: Wipe everything and ask again
+                                st.session_state.authenticated = False
+                                st.session_state.secret_key = ""
+                                st.error("Invalid API Key. Please try again.")
+                                st.stop()
+
+                            if verify_res.status_code == 200:
+                                # Key is valid! Unlock the dashboard.
+                                st.session_state.authenticated = True
+                                st.session_state.secret_key = input_key
+                                st.rerun()
+                            else:
+                                st.error(f"Unexpected response: {verify_res.status_code}")
+                                st.stop()
+                                
+                        except hx.ConnectError:
+                            st.error("CRITICAL: Cannot connect to Vortex Backend.")
+                            st.stop()
                 else:
                     st.error("Please Enter A Valid Key")
     else:
-        st.success("Successfully Authenticated Using Secret Key")
+        st.success("Successfully Authenticated")
         if st.button("Log Out"):
             st.session_state.secret_key = ""
             st.session_state.authenticated = False
             st.rerun()
 
 if not st.session_state.authenticated:
-    st.warning("Please authenticate in the sidebar")
+    st.info("Please authenticate in the sidebar to view your analytics.")
     st.stop()
 
 # navigation bar
@@ -58,14 +87,16 @@ st.sidebar.header("Navigation")
 # create the clickable menu
 current_page = st.sidebar.radio(
     "Select View:",
-    ["📈 Traffic Trends", "🔗 Top URLs"]
+    ["Overview", "Traffic Trends", "Top URLs"]
 )
 
-st.sidebar.divider()
-st.sidebar.header("🎛️ Filters")
+# CONDITIONAL FILTERS: Only show the "Filters" section if we are NOT on the Overview page
+if current_page != "Overview":
+    st.sidebar.divider()
+    st.sidebar.header("Filters")
 
 
-if current_page == "📈 Traffic Trends":
+if current_page == "Traffic Trends":
     days_filter= st.sidebar.number_input(
         "Time Range",
         min_value=1,
@@ -80,7 +111,7 @@ if current_page == "📈 Traffic Trends":
     # imm point 2
     # step=1 , user can only enter whole integer number -> 1,2,3,4 .....
 
-elif current_page == "🔗 Top URLs":
+elif current_page == "Top URLs":
     days_filter= st.sidebar.number_input(
         "Time Range",
         min_value=1,
@@ -96,8 +127,6 @@ elif current_page == "🔗 Top URLs":
         step=1            
     )
 
-
-st.title("Vortex Telemetry Engine")
 
 with st.spinner("Fetching Live Data"):
     try:
@@ -122,73 +151,118 @@ with st.spinner("Fetching Live Data"):
         st.error("Critical Error, Cant Connect To Api")
         st.stop()
 
-st.metric(label="All-Time Events Tracked", value=stats_data.get("Total_Count", 0))
+# Native Streamlit columns and containers for a sleek metric layout
+metric_cols = st.columns(2)
+
+with metric_cols[0]:
+    with st.container(border=True):
+        st.metric(label="All-Time Events Tracked", value=stats_data.get("Total_Count", 0))
+
+with metric_cols[1]:
+    with st.container(border=True):
+        st.metric(label="Workspace Tenant", value=stats_data.get("tenant", "Admin"))
+
 st.divider()
 
 
 # render page based on condition
 # only calls that api
 
-if current_page == "📈 Traffic Trends":
-    st.subheader(f"Traffic Trend (Last {days_filter} Days)")
-    with st.spinner("Fetching time-series data..."):
+if current_page == "Overview":
+    with st.container(border=True):
+        st.subheader("Welcome to your Workspace")
+        st.write("Use the navigation sidebar to explore your telemetry, traffic trends, and top URL performance.")
 
-        # events per day
-        time_res = hx.get(f"{API_BASE_URL}/events-per-day", headers=headers, params={"from_days": days_filter}, timeout=5.0)
-        time_res.raise_for_status()
-        raw_data = time_res.json()["data"]
-        # take out the date wise data from the json
+elif current_page == "Traffic Trends":
+    with st.container(border=True):
+        st.subheader(f"Traffic Trend (Last {days_filter} Days)")
+        st.write("")
+        with st.spinner("Fetching time-series data..."):
 
-        if len(raw_data)>0:
-            # if len=0 , no data for the specified date
+            # events per day
+            time_res = hx.get(f"{API_BASE_URL}/events-per-day", headers=headers, params={"from_days": days_filter}, timeout=5.0)
+            time_res.raise_for_status()
+            raw_data = time_res.json()["data"]
+            # take out the date wise data from the json
 
-            df=pd.DataFrame(raw_data)
-            # dump the json into pandas so it can build a data frame
-            #  data frame -> 2D structure (table)
+            if len(raw_data)>0:
+                # if len=0 , no data for the specified date
 
-            # now using plotly, plot the diagram
-            # px.line() -> line chart
-            fig=px.line(
-                data_frame=df,
-                x="date",
-                y="visits",
-                markers=True
-            )
-            # markers = true -> tells plotly to draw dots 
+                df=pd.DataFrame(raw_data)
+                # dump the json into pandas so it can build a data frame
+                #  data frame -> 2D structure (table)
 
-            # now use streamlit to display the chart on screen
-            st.plotly_chart(fig,use_container_width=True)
-        else:
-            # if there is no data
-            st.info(f"No traffic data found for the last {days_filter} days.")
+                # now using plotly, plot the diagram
+                # px.line() -> line chart
+                fig=px.line(
+                    data_frame=df,
+                    x="date",
+                    y="visits",
+                    markers=True
+                )
+                
+                # AESTHETIC UPDATES FOR LINE CHART
+                # Thicker lines, no hardcoded colors (adapts to theme), subtle Y-axis grid
+                fig.update_traces(line=dict(width=3), marker=dict(size=8))
+                fig.update_layout(
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    xaxis=dict(showgrid=False),
+                    yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)"),
+                    margin=dict(l=0, r=0, t=20, b=0)
+                )
+                
+                # THE SMART THRESHOLD: Forces category if 14 days or less to hide empty hours
+                if len(df) <= 14:
+                    fig.update_xaxes(type='category')
 
-elif current_page == "🔗 Top URLs":
-    st.subheader(f"Top {top_n_filter} URLs (Last {days_filter} Days)")
-    with st.spinner("Fetching ranking data..."):
-        # top urls
-        url_res = hx.get(f"{API_BASE_URL}/top-urls", headers=headers, params={"days_ago": days_filter, "top": top_n_filter}, timeout=5.0)
-        url_res.raise_for_status()
-        raw_url_data = url_res.json()["data"]
-        # data = [{"url": and "visits":}]
+                # now use streamlit to display the chart on screen
+                # theme="streamlit" is default, making it match dark/light mode automatically
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                # if there is no data
+                st.info(f"No traffic data found for the last {days_filter} days.")
 
-        if(len(raw_url_data)>0):
-            df=pd.DataFrame(raw_url_data)
-            # a data frame of url and visits
-        
-        # reverse the order so the highest number is at the top of the chart
-            df = df.sort_values(by="visits", ascending=True)
+elif current_page == "Top URLs":
+    with st.container(border=True):
+        st.subheader(f"Top {top_n_filter} URLs (Last {days_filter} Days)")
+        st.write("")
+        with st.spinner("Fetching ranking data..."):
+            # top urls
+            url_res = hx.get(f"{API_BASE_URL}/top-urls", headers=headers, params={"days_ago": days_filter, "top": top_n_filter}, timeout=5.0)
+            url_res.raise_for_status()
+            raw_url_data = url_res.json()["data"]
+            # data = [{"url": and "visits":}]
 
-        # bar chart using plotly
-            fig = px.bar(
-                data_frame=df, 
-                x="visits",       # no of visits -> length on bar
-                y="url",          # url is label for the bars
-                orientation="h",  # h -> horizontal
-                color="visits",   # auto color bar based on size
-                color_continuous_scale="Viridis" # colour pallete
-            )
-        # use streamlit to render chart
-            st.plotly_chart(fig, use_container_width=True)
+            if(len(raw_url_data)>0):
+                df=pd.DataFrame(raw_url_data)
+                # a data frame of url and visits
             
-        else:
-            st.info(f"No URLs found for the last {days_filter} days.")
+            # reverse the order so the highest number is at the top of the chart
+                df = df.sort_values(by="visits", ascending=True)
+
+            # bar chart using plotly
+                fig = px.bar(
+                    data_frame=df, 
+                    x="visits",       # no of visits -> length on bar
+                    y="url",          # url is label for the bars
+                    orientation="h",  # h -> horizontal
+                    color="visits",   # auto color bar based on size
+                    color_continuous_scale="Viridis" # Professional color scale
+                )
+                
+                # AESTHETIC UPDATES FOR BAR CHART
+                fig.update_layout(
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)"),
+                    yaxis=dict(showgrid=False),
+                    margin=dict(l=0, r=0, t=20, b=0)
+                )
+                # Note: The line disabling the color scale has been removed to restore the legend.
+                
+            # use streamlit to render chart
+                st.plotly_chart(fig, use_container_width=True)
+                
+            else:
+                st.info(f"No URLs found for the last {days_filter} days.")
