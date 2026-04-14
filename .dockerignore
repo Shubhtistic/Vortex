@@ -1,0 +1,9 @@
+# currenly we are in a monorepo and we direcly copy app/ code to image
+# so this is kind of redundant in our case
+# but its a good practice to have
+# and may help in future changes
+__pycache__/
+*.pyc
+.env
+dashboard/
+tests/
