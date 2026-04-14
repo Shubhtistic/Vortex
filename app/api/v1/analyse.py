@@ -3,21 +3,22 @@ from typing import Any
 
 from sqlmodel import func, select, desc
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.db.db_models import Event
 from app.dependancies.db_dependancy import DbSessionDep
 from app.dependancies.security import SecretKeyDep
+from app.dependancies.rate_limiter import RateLimiter
 
 router = APIRouter()
 
-@router.get("/verify")
+@router.get("/verify",dependencies=[Depends(RateLimiter(20))])
 async def verify_auth(api_key: SecretKeyDep):
     """
     Dedicated endpoint for the frontend to verify a Secret Key during login.
     """
     return {"status": "success", "tenant": api_key.tenant_id}
 
-@router.get("/stats")
+@router.get("/stats", dependencies=[Depends(RateLimiter(20))])
 async def return_number(
     session: DbSessionDep,
     api_key: SecretKeyDep,
@@ -33,7 +34,7 @@ async def return_number(
     return {"status": "Success", "tenant": api_key.tenant_id, "Total_Count": count}
 
 
-@router.get("/top-urls")
+@router.get("/top-urls",dependencies=[Depends(RateLimiter(20))] )
 async def top_urls(
     db: DbSessionDep, api_key: SecretKeyDep, days_ago: int = 3, top: int = 5
 ):
@@ -59,7 +60,7 @@ async def top_urls(
     return {"status": "success", "tenant": api_key.tenant_id, "data": top_urls}
 
 
-@router.get("/events-per-day")
+@router.get("/events-per-day",dependencies=[Depends(RateLimiter(20))])
 async def events_per_day(db: DbSessionDep, api_key: SecretKeyDep, from_days: int = 7):
     """Returns the number of events per day for a time-series chart."""
 
