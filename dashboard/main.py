@@ -255,4 +255,6 @@ elif current_page == "Top URLs":
                 st.plotly_chart(fig, width="stretch")
                 
             else:
-                st.info(f"No URLs found for the last {days_filter} days.")
+                st.info(f"No URLs found for the last {days_filter} days.") 
+
+                

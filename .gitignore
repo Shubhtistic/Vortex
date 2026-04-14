@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 seed.py
+.pytest_cache/
+.devcontainer/
 
 # virtual environments are massive folders we dont need on git
 venv/
