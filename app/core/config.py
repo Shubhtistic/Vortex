@@ -7,7 +7,6 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
 
     # database url
-    # our app wiill crash without this
     POSTGRES_SERVER: str
     POSTGRES_PORT: str
     POSTGRES_USER: str
@@ -16,6 +15,9 @@ class Settings(BaseSettings):
     POSTGRES_TEST_DB:str
 
     REDIS_URL: str
+
+    # Secret Url to Access docs endpoint
+    DOCS_ENDPOINT:str
 
     class Config:
         # Tell Pydantic to read the file named .env
