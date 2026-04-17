@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
 
 # give app the lifespan
 app = FastAPI(title="Vortex Telemetry Engine", lifespan=lifespan,
-              docs_url=settings.DOCS_ENDPOINT,
+              docs_url=f"/{settings.DOCS_ENDPOINT}",
               redoc_url=None)
 
 # we set the docs_url to env variable 
