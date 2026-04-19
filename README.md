@@ -200,12 +200,13 @@ docker compose logs api \
 
 ---
 
-## Future Roadmap
+## Future Improvements
 
-- [ ] JavaScript SDK (`vortex.track()`)
-- [ ] Origin allowlisting (per-tenant CORS enforcement)
-- [ ] ClickHouse / TimescaleDB support for high-volume deployments
-
+- [ ] Implement Redis-backed batching (Bulk SQL Inserts) to reduce database I/O.
+- [ ] Migrate from Celery to ARQ for native `asyncio` worker performance.
+- [ ] JavaScript SDK (`vortex.track()`).
+- [ ] Origin allowlisting (per-tenant CORS enforcement).
+- [ ] ClickHouse / TimescaleDB support for high-volume deployments.
 ---
 
 ## Contributing

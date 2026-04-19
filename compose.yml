@@ -89,7 +89,8 @@ services:
       - .env
     volumes:
       - ./app:/vortex/app
-    command: celery -A app.core.celery_app worker --loglevel=info
+    command: celery -A app.core.celery_app worker --pool=gevent --concurrency=100 --loglevel=info
+    ## --concurrency=100 -> 100 greenlets(coroutines)
     restart: on-failure 
     deploy:
       resources:
