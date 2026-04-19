@@ -32,7 +32,7 @@ with st.sidebar:
     # if not logged in
     if st.session_state.authenticated is False:
         with st.form("Login Form"):
-            input_key=st.text_input("Please Enter The Secret Key", type="password")
+            input_key=st.text_input("Please Enter The Secret Key", type="password").strip()
             submit_button=st.form_submit_button("Authenticate")
 
             if submit_button:
