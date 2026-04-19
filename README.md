@@ -11,7 +11,7 @@
 
 ## The Problem
 
-Companies pay thousands of dollars a month to Segment, Mixpanel, and PostHog — just to track their own users' clicks. Beyond cost, every event you send to a third-party SaaS is data you no longer fully own.
+Companies pay thousands of dollars a month to Segment, Mixpanel, and PostHog just to track their own users' clicks. Beyond cost, every event you send to a third-party SaaS is data you no longer fully own.
 
 **Vortex is the alternative.** Self-host a professional telemetry pipeline on your own infrastructure. One `docker compose up` and you have a production-ready event ingestion and analytics backend.
 
@@ -19,7 +19,7 @@ Companies pay thousands of dollars a month to Segment, Mixpanel, and PostHog —
 
 ## Features
 
-- **Non-blocking ingestion** — FastAPI accepts events and hands them to Celery via Redis. The HTTP response is returned in single-digit milliseconds; the database write happens asynchronously.
+- **Non-blocking ingestion** — FastAPI accepts events and dumps them directly into Redis RAM. The HTTP response is returned in a instance. The database write happens asynchronously in batches.
 - **Multi-tenant by design** — every tenant gets isolated pub/sec API key pairs. Data is strictly scoped per tenant at the query level.
 - **Per-tenant rate limiting** — atomic Redis counters enforce request limits before any payload ever touches PostgreSQL.
 - **Separation of powers** — Public Keys can only write. Secret Keys can only read. Enforced at the endpoint level.
@@ -37,16 +37,35 @@ Client (vtx_pub_...)
         │
    Rate Limit Check (Redis)
         │
-   Push to Task Queue (Redis)
+   Push to Redis List (vortex_buffer)
         │
    202 Accepted ──► Client
         │
-   Celery Worker pulls task
+   ARQ Worker sweeps batch (every 5s)
         │
-   INSERT into PostgreSQL
+   Bulk INSERT into PostgreSQL
 ```
 
-**Analytics reads** (`vtx_sec_...`) go directly from FastAPI to PostgreSQL with tenant-level row isolation.
+Analytics reads (`vtx_sec_...`) go directly from FastAPI to PostgreSQL with tenant-level row isolation.
+
+---
+
+## Architecture Evolution: Celery to ARQ
+
+Initially, Vortex used **Celery** as its background task queue. While Celery is an industry standard, it is fundamentally synchronous and relies on thread/process pooling to handle concurrency.
+
+As the engine scaled to handle thousands of async FastAPI requests, Celery caused two core problems:
+
+- **Event loop conflicts** — forcing Celery to run `asyncio` database drivers (`asyncpg`) caused "Task attached to a different loop" crashes at runtime.
+- **Connection pool leaks** — sharing SQLAlchemy `QueuePool` configurations between the FastAPI process and the isolated worker container caused ghost connections and database lockups.
+
+**The ARQ solution** migrates the entire background processing layer to **ARQ**, a job queue built natively for Python's `asyncio` and `redis.asyncio`. This enabled a true zero-data-loss batching pipeline:
+
+1. **The hose (FastAPI)** — ingests JSON payloads and writes directly to Redis RAM via `RPUSH` in ~1ms without ever touching the database.
+2. **The atomic swap** — the ARQ worker wakes every 5 seconds and runs an instant `RENAME` on the Redis list. This O(1) operation guarantees zero race conditions with incoming API traffic.
+3. **The isolated sweeper** — using SQLAlchemy's `NullPool` inside the ARQ context, the worker opens a single isolated database connection, bulk-inserts hundreds of events at once, closes the connection, and deletes the processed Redis key.
+
+The result is a pipeline that absorbs massive traffic spikes without exhausting database connections or blocking the main API event loop.
 
 ---
 
@@ -79,19 +98,19 @@ DOCS_ENDPOINT=your_docs_secret_here
 ### 2. Start the stack
 
 ```bash
-# Development (hot reload enabled)
+# Development
 docker compose up --build
 
 # Production (detached)
 docker compose -f compose.prod.yml up -d --build
 ```
 
-Docker will boot services in dependency order automatically:
+Docker boots services in dependency order automatically:
 
 | Step | Services | Condition |
 |------|----------|-----------|
 | 1 | `postgres_database` + `redis` | Start immediately in parallel |
-| 2 | `migrate` | Waits for postgres healthcheck, runs migrations, exits |
+| 2 | `migrate` | Waits for postgres healthcheck, runs migrations, then exits |
 | 3 | `api` + `worker` | Start after migrate exits successfully |
 
 ---
@@ -130,13 +149,13 @@ curl -X POST https://your-domain.com/api/v1/track \
 
 ## Tenant Management
 
-Use the built-in CLI wizard to create tenants and manage API keys. No direct database access required.
+Use the built-in CLI wizard to create tenants and manage API keys. No direct database access needed.
 
 ```bash
 docker compose exec -it api python -m app.cli
 ```
 
-The wizard will create a tenant and generate a `vtx_pub_` / `vtx_sec_` key pair. **The secret key is shown only once** — store it in a secrets manager immediately.
+The wizard creates a tenant and generates a `vtx_pub_` / `vtx_sec_` key pair. The secret key is shown only once — store it immediately.
 
 ---
 
@@ -145,19 +164,19 @@ The wizard will create a tenant and generate a `vtx_pub_` / `vtx_sec_` key pair.
 | Strategy | Compute | Database | Cache |
 |----------|---------|----------|-------|
 | All-in-One | EC2 / Any VPS | Docker Container | Docker Container |
-| Production Standard | EC2 (Dockerized) | **AWS RDS** | Docker Container |
+| Production Standard | EC2 (Dockerized) | AWS RDS | Docker Container |
 | Full Managed | EC2 Auto-scaling | AWS RDS | AWS ElastiCache |
 | Zero-Cost | Render / Railway | Neon.tech / Supabase | Upstash Redis |
 
 The project is verified on **AWS EC2 `t2.micro` + AWS RDS** within the AWS Free Tier.
 
-For the zero-cost path, point `.env` at a [Neon.tech](https://neon.tech) Postgres URL and an [Upstash](https://upstash.com) Redis URL — no other changes needed.
+For the zero-cost path, point `.env` at a [Neon.tech](https://neon.tech) Postgres URL and an [Upstash](https://upstash.com) Redis URL. No other changes needed.
 
 ---
 
 ## Performance
 
-Load tested with [Grafana k6](https://k6.io) — 70 concurrent virtual users across 10 tenants on a `t2.micro`.
+Load tested with [Grafana k6](https://k6.io) using 70 concurrent virtual users across 10 tenants on a `t2.micro`.
 
 | Metric | Result |
 |--------|--------|
@@ -166,15 +185,15 @@ Load tested with [Grafana k6](https://k6.io) — 70 concurrent virtual users acr
 | Ingestion latency p(95) | **84.0 ms** |
 | True error rate | ~0% |
 
-> The 37.8% observed error rate in raw results is exclusively `429 Too Many Requests` from the rate limiter functioning correctly — not application failures.
+> IMP NOTE: We observed an error rate of 37.8% in raw results, which is exclusively due to `429 Too Many Requests` from the rate limiter working correctly — not application failures.
 
 ---
 
 ## Stack
 
 - **[FastAPI](https://fastapi.tiangolo.com)** — async HTTP layer
-- **[Celery](https://docs.celeryq.dev)** — distributed task queue
-- **[Redis](https://redis.io)** — task broker and rate limit counters
+- **[ARQ](https://arq-docs.helpmanual.io/)** — native asyncio job queue
+- **[Redis](https://redis.io)** — high-speed buffer and rate limit counters
 - **[PostgreSQL](https://postgresql.org)** — persistent event storage
 - **[Alembic](https://alembic.sqlalchemy.org)** — database migrations
 - **[Docker Compose](https://docs.docker.com/compose)** — orchestration
@@ -187,7 +206,7 @@ Load tested with [Grafana k6](https://k6.io) — 70 concurrent virtual users acr
 # Live API logs
 docker compose logs -f api
 
-# Celery worker logs
+# ARQ worker logs
 docker compose logs -f worker
 
 # Surface non-standard errors only
@@ -202,11 +221,10 @@ docker compose logs api \
 
 ## Future Improvements
 
-- [ ] Implement Redis-backed batching (Bulk SQL Inserts) to reduce database I/O.
-- [ ] Migrate from Celery to ARQ for native `asyncio` worker performance.
-- [ ] JavaScript SDK (`vortex.track()`).
-- [ ] Origin allowlisting (per-tenant CORS enforcement).
-- [ ] ClickHouse / TimescaleDB support for high-volume deployments.
+- [ ] JavaScript SDK (`vortex.track()`)
+- [ ] Origin allowlisting (per-tenant CORS enforcement)
+- [ ] ClickHouse / TimescaleDB support for high-volume deployments
+
 ---
 
 ## Contributing

@@ -8,6 +8,7 @@ from app.core.config import settings
 
 engine = create_async_engine(settings.POSTGRES_URL, echo=True)
 # echo = True -> o/p shown on our terminal
+# turn echo off in production
 
 
 LocalAsyncSession = async_sessionmaker(

@@ -1,58 +1,50 @@
-# main issue
-# our fastpai is running in async manner
-# but celery works synchronously by default
-# we have force/teach celery on how to work in async manner
-
-import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
-
-from app.core.celery_app import celery_app
-from app.core.config import settings
+import json
 from app.db.db_models import Event
+from sqlalchemy import NullPool, insert
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from app.core.config import settings
 
-# Null Pool Concept
-# We create a special engine just for the worker using NullPool.
-# NullPool means "Open a connection, use it, and destroy it immediately."
-# This prevents the "attached to a different loop" error.
+# nullpool -> open a connection and close it
+# best for worker as it runs every 5 secs
 worker_engine = create_async_engine(
     settings.POSTGRES_URL,
-    echo=True,
     poolclass=NullPool,
+    echo=False,
 )
 
 WorkerSession = async_sessionmaker(
     worker_engine, class_=AsyncSession, expire_on_commit=False
 )
 
+async def save_batch(ctx):
+    # extract the redis connection from the context
+    redis=ctx["redis"]
 
-async def save_event_to_db(data: dict):
-    async with WorkerSession() as session:
-        event_db = Event(**data)
-        session.add(event_db)
-        await session.commit()
-        await session.refresh(event_db)
-        print(f"saved: {event_db.id}")
-        return str(event_db.id)
-
-
-# @celery_app.task turns this into a job that redis can triger
-@celery_app.task
-def process_event_task(event_data: dict):
+    # the rename trick
+    # rename the specific data that is in redis at that moment
+    # doing this that key gets changed to new name and old one doest not exist
+    # so then the endpoint creates a new one
     try:
-        # Step 1: Try to find an already running event loop (Pytest Eager Mode)
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
+        await redis.rename("vortex_buffer","process_buffer")
+    except:
+        # if vortex buffer is zero it means no active inserts
+        return "no_events_to_add"
+    
+    # pull everything out of this bucket
+    raw_events=await redis.lrange("process_buffer", 0, -1) # 0,-1 -> start and end index
 
-    if loop and loop.is_running():
-        # Step 2: Test Environment
-        # A loop is already running! We schedule the DB write in the background 
-        # instead of trying to force a new loop to start.
-        loop.create_task(save_event_to_db(event_data))
-        return "queued in existing loop"
-    else:
-        # Step 3: Production Environment
-        # The Celery worker thread has no loop. We safely create one 
-        # and run the database function synchronously.
-        return asyncio.run(save_event_to_db(event_data))
+    if not raw_events:
+        await redis.delete("process_buffer")
+        return "empty"
+    # convert this json back into dict
+    events_to_insert=[json.loads(event_str) for event_str in raw_events]
+
+    async with WorkerSession() as session:
+        await session.execute(insert(Event).values(events_to_insert))
+        await session.commit()
+
+    # delete the isolated bucket
+    await redis.delete("process_buffer")
+    
+    print(f"Successfully batched {len(events_to_insert)} events to the database.")
+    return True

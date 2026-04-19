@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from app.core.redis import close_redis_pool,init_redis_pool
 
 
 # routers
@@ -13,7 +14,15 @@ from app.core.config import settings
 # this runs before app receives request
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    # This runs exactly once when the server starts
+    print("starting redis loop..")
+    await init_redis_pool()
+    
+    yield # api is now running and accepting requests
+    
+    # This runs exactly once when the server shuts down
+    print("closing redis loop...")
+    await close_redis_pool()
 
 
 # give app the lifespan
@@ -22,7 +31,7 @@ app = FastAPI(title="Vortex Telemetry Engine", lifespan=lifespan,
               redoc_url=None)
 
 # we set the docs_url to env variable 
-# you can also disable it using docs_url = None
+# we can also disable it using docs_url = None
 
 
 app.include_router(create.router, prefix="/api/v1")

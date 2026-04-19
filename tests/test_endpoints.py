@@ -44,7 +44,6 @@ async def test_track_event(fastapi_client,session):
 
     assert data["status"]== "queued"
     assert data["message"] == "Event received and is being processed in background"
-    assert data["task_id"] is not None
 
     # Database check
     statement= select(Event).where(Event.tenant_id== tenant_id)
