@@ -1,10 +1,11 @@
 # using this we tell our fastapi app how to talk to arq
 # we create redis pool for it
 from arq import create_pool
+from app.core.config import settings
 from arq.connections import RedisSettings
 
 # this tell redis to how to connect to our redis
-REDIS_SETTINGS=RedisSettings(host="redis", port=6379)
+REDIS_SETTINGS=RedisSettings(host=settings.REDIS_HOST, port=6379)
 
 # We will store the pool in a global variable so the whole app can share it
 redis_pool = None

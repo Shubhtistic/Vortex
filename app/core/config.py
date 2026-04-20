@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     POSTGRES_TEST_DB:str
 
     REDIS_URL: str
+    REDIS_HOST:str
 
     # Secret Url to Access docs endpoint
     DOCS_ENDPOINT:str
