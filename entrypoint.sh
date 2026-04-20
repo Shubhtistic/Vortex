@@ -10,7 +10,5 @@ until pg_isready -h "${POSTGRES_SERVER}" -p 5432 -U "${POSTGRES_USER}"; do
 done
 
 echo "Postgres is ready!"
-
 # hand control to cmd
-# fastapi/celery -> pid 1
 exec "$@"
