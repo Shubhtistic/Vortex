@@ -6,16 +6,16 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from app.db.db_models import SQLModel
 from app.main import app
+from app.core.redis import init_redis_pool,close_redis_pool
 
 from app.db.session import get_session
 from app.core.config import settings
-from app.core.celery_app import celery_app
 
 async_engine=create_async_engine(settings.TEST_POSTGRES_URL, echo=True)
 
 # fixture -> a piece of code that runs before our tests to give us all required tools
 @pytest_asyncio.fixture(scope="session", autouse=True)
-# scope = "session" -> only run this for first time, buikdding table is slow
+# scope = "session" -> only run this for first time, building table is slow
 # autouse -> runs in background without us having to run it explicitly
 # autouse -> run automatically when we type 'pytest'
 async def setup_database():
@@ -23,9 +23,19 @@ async def setup_database():
         await connection.run_sync(SQLModel.metadata.create_all)
         # first lets build all table in the mock db
     yield # pause
+
+    #  when test closes this runs
     async with async_engine.begin() as connection:
         await connection.run_sync(SQLModel.metadata.drop_all)
     await async_engine.dispose() # close all db connections
+
+
+
+@pytest_asyncio.fixture(scope="session",autouse=True)
+async def setup_redis():
+    await init_redis_pool()
+    yield
+    await close_redis_pool()
 
 
 @pytest_asyncio.fixture(name="session")
@@ -76,8 +86,6 @@ async def client_fixture(session:AsyncSession, monkeypatch:MonkeyPatch):
     # We replace WorkerSession inside tasks.py and replace it with our safe version
     monkeypatch.setattr("app.tasks.WorkerSession", override_worker_session)
 
-    celery_app.conf.task_always_eager = True
-    celery_app.conf.task_eager_propagates = True
 
     #create the fake browser
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
@@ -101,5 +109,3 @@ async def client_fixture(session:AsyncSession, monkeypatch:MonkeyPatch):
     # could be "http://anything" — doesn't matter
 
     app.dependency_overrides.clear()
-    celery_app.conf.task_always_eager = False
-    celery_app.conf.task_eager_propagates = False 
