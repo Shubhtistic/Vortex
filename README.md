@@ -19,11 +19,11 @@ Companies pay thousands of dollars a month to Segment, Mixpanel, and PostHog jus
 
 ## Features
 
-- **Non-blocking ingestion** — FastAPI accepts events and dumps them directly into Redis RAM. The HTTP response is returned in a instance. The database write happens asynchronously in batches.
-- **Multi-tenant by design** — every tenant gets isolated pub/sec API key pairs. Data is strictly scoped per tenant at the query level.
-- **Per-tenant rate limiting** — atomic Redis counters enforce request limits before any payload ever touches PostgreSQL.
+- **Non-blocking ingestion** — FastAPI accepts events and writes them directly to Redis. The HTTP response is returned immediately. The database write happens asynchronously in batches.
+- **Multi-tenant by design** — every tenant gets isolated public/secret API key pairs. Data is strictly scoped per tenant at the query level.
+- **Per-tenant rate limiting** — atomic Redis counters enforce request limits before any payload is written to PostgreSQL.
 - **Separation of powers** — Public Keys can only write. Secret Keys can only read. Enforced at the endpoint level.
-- **Runs on free-tier hardware** — verified at 131.5 req/sec sustained on an AWS EC2 `t2.micro`.
+- **Runs on free-tier hardware** — verified at 136.5 req/sec sustained on an AWS EC2 `t2.micro`.
 
 ---
 
@@ -56,16 +56,16 @@ Initially, Vortex used **Celery** as its background task queue. While Celery is 
 
 As the engine scaled to handle thousands of async FastAPI requests, Celery caused two core problems:
 
-- **Event loop conflicts** — forcing Celery to run `asyncio` database drivers (`asyncpg`) caused "Task attached to a different loop" crashes at runtime.
+- **Event loop conflicts** — running `asyncio` database drivers (`asyncpg`) inside Celery caused "Task attached to a different loop" crashes at runtime.
 - **Connection pool leaks** — sharing SQLAlchemy `QueuePool` configurations between the FastAPI process and the isolated worker container caused ghost connections and database lockups.
 
 **The ARQ solution** migrates the entire background processing layer to **ARQ**, a job queue built natively for Python's `asyncio` and `redis.asyncio`. This enabled a true zero-data-loss batching pipeline:
 
-1. **The hose (FastAPI)** — ingests JSON payloads and writes directly to Redis RAM via `RPUSH` in ~1ms without ever touching the database.
-2. **The atomic swap** — the ARQ worker wakes every 5 seconds and runs an instant `RENAME` on the Redis list. This O(1) operation guarantees zero race conditions with incoming API traffic.
-3. **The isolated sweeper** — using SQLAlchemy's `NullPool` inside the ARQ context, the worker opens a single isolated database connection, bulk-inserts hundreds of events at once, closes the connection, and deletes the processed Redis key.
+1. **FastAPI** — accepts JSON payloads and writes them to Redis via `RPUSH` in ~1ms without touching the database.
+2. **Atomic swap** — the ARQ worker wakes every 5 seconds and runs a `RENAME` on the Redis list. This O(1) operation guarantees zero race conditions with incoming API traffic.
+3. **Isolated worker** — using SQLAlchemy's `NullPool` inside the ARQ context, the worker opens a single isolated database connection, bulk-inserts all pending events, closes the connection, and deletes the processed Redis key.
 
-The result is a pipeline that absorbs massive traffic spikes without exhausting database connections or blocking the main API event loop.
+The result is a pipeline that handles large traffic spikes without exhausting database connections or blocking the main API event loop.
 
 ---
 
@@ -176,13 +176,13 @@ For the zero-cost path, point `.env` at a [Neon.tech](https://neon.tech) Postgre
 
 ## Performance
 
-Load tested with [Grafana k6](https://k6.io) using 70 concurrent virtual users across 10 tenants on a `t2.micro`.
+Load tested with [Grafana k6](https://k6.io) using 70 concurrent virtual users across 15 tenants on a `t2.micro`.
 
 | Metric | Result |
 |--------|--------|
-| Total requests (5 min) | ~39,463 |
-| Sustained throughput | **131.5 req/sec** |
-| Ingestion latency p(95) | **84.0 ms** |
+| Total requests (5 min) | ~40,391 |
+| Sustained throughput | **134.5 req/sec** |
+| Ingestion latency p(95) | **45.0 ms** |
 | True error rate | ~0% |
 
 > IMP NOTE: We observed an error rate of 37.8% in raw results, which is exclusively due to `429 Too Many Requests` from the rate limiter working correctly — not application failures.
