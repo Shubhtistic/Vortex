@@ -43,7 +43,7 @@ with st.sidebar:
                             verify_res = hx.get(
                                 f"{API_BASE_URL}/verify", 
                                 headers={"X-API-Key": input_key}, 
-                                timeout=3.0
+                                timeout=10.0
                             )
                             
                             if verify_res.status_code == 401:
@@ -130,7 +130,7 @@ with st.spinner("Fetching Live Data"):
         headers={"X-API-Key":st.session_state.secret_key}
 
         # total events
-        stats_result=hx.get(url=f"{API_BASE_URL}/stats", headers=headers, timeout=5)
+        stats_result=hx.get(url=f"{API_BASE_URL}/stats", headers=headers, timeout=10.0)
 
         if stats_result.status_code == 401:
             # false api key, invalidate the user 
@@ -176,7 +176,7 @@ elif current_page == "Traffic Trends":
         with st.spinner("Fetching time-series data..."):
 
             # events per day
-            time_res = hx.get(f"{API_BASE_URL}/events-per-day", headers=headers, params={"from_days": days_filter}, timeout=5.0)
+            time_res = hx.get(f"{API_BASE_URL}/events-per-day", headers=headers, params={"from_days": days_filter}, timeout=10.0)
             time_res.raise_for_status()
             raw_data = time_res.json()["data"]
             # take out the date wise data from the json
@@ -221,7 +221,7 @@ elif current_page == "Top URLs":
         st.write("")
         with st.spinner("Fetching ranking data..."):
             # top urls
-            url_res = hx.get(f"{API_BASE_URL}/top-urls", headers=headers, params={"days_ago": days_filter, "top": top_n_filter}, timeout=5.0)
+            url_res = hx.get(f"{API_BASE_URL}/top-urls", headers=headers, params={"days_ago": days_filter, "top": top_n_filter}, timeout=10.0)
             url_res.raise_for_status()
             raw_url_data = url_res.json()["data"]
             # data = [{"url": and "visits":}]
