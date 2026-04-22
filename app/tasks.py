@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 from app.db.db_models import Event
 from sqlalchemy import NullPool, insert
@@ -36,15 +37,60 @@ async def save_batch(ctx):
     if not raw_events:
         await redis.delete("process_buffer")
         return "empty"
-    # convert this json back into dict
-    events_to_insert=[json.loads(event_str) for event_str in raw_events]
+
+    # Major bug
+    # during massives inserts sqlalchemy skipped the auto generated python timestamp variable
+    # due to which many records had no date
+    # so we manually add a timestap to these elements
+
+    # Also postgres has a limit of max 64k parameters per query
+    # so our db has 6 columns
+    # so 6x10 -> 60k very close, if we even single new column this would go to 70k parameters
+    # which would cause TooManyParameters Error
+
+    # so lets use a simple 6k chunk size per batch
+
+    total_inserted=0
+
+    CHUNK_SIZE=6000
+
+
 
     async with WorkerSession() as session:
-        await session.execute(insert(Event).values(events_to_insert))
+
+
+        for i in range(0,len(raw_events),CHUNK_SIZE):
+            # lets say less than 6k events are present
+            # in that case we cant jump by 6k elements
+            # so this loop then starts at zero and runs once as it cant take 6k step interval
+
+            chunk_strings=raw_events[i:i+CHUNK_SIZE]
+            # in this case also if we go out of bounds
+            # python wont throw errors it will just take whatever is present if does not have 6k events
+
+            events_to_insert=[]
+
+            batch_timestamp=datetime.now(timezone.utc)
+            # timestamp for this entire batch
+
+            for event_str in chunk_strings:
+
+                event_dict=json.loads(event_str)
+
+                event_dict["timestamp"]=batch_timestamp
+
+                events_to_insert.append(event_dict)
+
+            total_inserted=total_inserted+len(events_to_insert)
+
+            # runs for every batch created
+            await session.execute(insert(Event).values(events_to_insert))
+
+        # final commit
         await session.commit()
 
     # delete the isolated bucket
     await redis.delete("process_buffer")
     
-    print(f"Successfully batched {len(events_to_insert)} events to the database.")
+    print(f"Successfully batched {total_inserted} events to the database.")
     return True
