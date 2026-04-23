@@ -60,7 +60,10 @@ with st.sidebar:
                             else:
                                 st.error(f"Unexpected response: {verify_res.status_code}")
                                 st.stop()
-                                
+                        
+                        except hx.HTTPStatusError as e:
+                            if e.response.status_code == 429:
+                                print("You have been rate limited, please wait for 1 mins ... ")
                         except hx.ConnectError:
                             st.error("CRITICAL: Cannot connect to Vortex Backend.")
                             st.stop()
