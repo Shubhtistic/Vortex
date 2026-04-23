@@ -63,7 +63,11 @@ with st.sidebar:
                         
                         except hx.HTTPStatusError as e:
                             if e.response.status_code == 429:
-                                print("You have been rate limited, please wait for 1 mins ... ")
+                                st.warning("The API is currently rate-limited due to heavy traffic. Please wait a minute and try again.")
+                                st.stop()
+                            else:
+                                st.error(f"API returned an error: {e.response.status_code}")
+                                st.stop()
                         except hx.ConnectError:
                             st.error("CRITICAL: Cannot connect to Vortex Backend.")
                             st.stop()
@@ -147,6 +151,13 @@ with st.spinner("Fetching Live Data"):
         stats_result.raise_for_status()
         stats_data=stats_result.json()
 
+    except hx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            st.warning("The API is currently rate-limited due to heavy traffic. Please wait a minute and try again.")
+            st.stop()
+        else:
+            st.error(f"API returned an error: {e.response.status_code}")
+            st.stop()
     except hx.ConnectError :
         st.error("Critical Error, Cant Connect To Api")
         st.stop()
@@ -177,87 +188,102 @@ elif current_page == "Traffic Trends":
         st.subheader(f"Traffic Trend (Last {days_filter} Days)")
         st.write("")
         with st.spinner("Fetching time-series data..."):
+            try:
+                # events per day
+                time_res = hx.get(f"{API_BASE_URL}/events-per-day", headers=headers, params={"from_days": days_filter}, timeout=10.0)
+                time_res.raise_for_status()
+                raw_data = time_res.json()["data"]
+                # take out the date wise data from the json
 
-            # events per day
-            time_res = hx.get(f"{API_BASE_URL}/events-per-day", headers=headers, params={"from_days": days_filter}, timeout=10.0)
-            time_res.raise_for_status()
-            raw_data = time_res.json()["data"]
-            # take out the date wise data from the json
+                if len(raw_data)>0:
+                    # if len=0 , no data for the specified date
 
-            if len(raw_data)>0:
-                # if len=0 , no data for the specified date
+                    df=pd.DataFrame(raw_data)
+                    # dump the json into pandas so it can build a data frame
+                    #  data frame -> 2D structure (table)
 
-                df=pd.DataFrame(raw_data)
-                # dump the json into pandas so it can build a data frame
-                #  data frame -> 2D structure (table)
+                    # now using plotly, plot the diagram
+                    # px.line() -> line chart
+                    fig=px.line(
+                        data_frame=df,
+                        x="date",
+                        y="visits",
+                        markers=True
+                    )
+                    
+                    fig.update_traces(line=dict(width=3), marker=dict(size=8))
+                    fig.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        xaxis=dict(showgrid=False),
+                        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)"),
+                        margin=dict(l=0, r=0, t=20, b=0)
+                    )
+                    
+                    if len(df) <= 6:
+                        fig.update_xaxes(type='category')
 
-                # now using plotly, plot the diagram
-                # px.line() -> line chart
-                fig=px.line(
-                    data_frame=df,
-                    x="date",
-                    y="visits",
-                    markers=True
-                )
-                
-                fig.update_traces(line=dict(width=3), marker=dict(size=8))
-                fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    xaxis=dict(showgrid=False),
-                    yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)"),
-                    margin=dict(l=0, r=0, t=20, b=0)
-                )
-                
-                if len(df) <= 6:
-                    fig.update_xaxes(type='category')
-
-                # now use streamlit to display the chart on screen
-                st.plotly_chart(fig, width="stretch")
-            else:
-                # if there is no data
-                st.info(f"No traffic data found for the last {days_filter} days.")
+                    # now use streamlit to display the chart on screen
+                    st.plotly_chart(fig, width="stretch")
+                else:
+                    # if there is no data
+                    st.info(f"No traffic data found for the last {days_filter} days.")
+                    
+            except hx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    st.warning("The API is currently rate-limited due to heavy traffic. Please wait a minute and try again.")
+                else:
+                    st.error(f"API returned an error: {e.response.status_code}")
+            except hx.ConnectError:
+                st.error("Critical Error, Cant Connect To Api")
 
 elif current_page == "Top URLs":
     with st.container(border=True):
         st.subheader(f"Top {top_n_filter} URLs (Last {days_filter} Days)")
         st.write("")
         with st.spinner("Fetching ranking data..."):
-            # top urls
-            url_res = hx.get(f"{API_BASE_URL}/top-urls", headers=headers, params={"days_ago": days_filter, "top": top_n_filter}, timeout=10.0)
-            url_res.raise_for_status()
-            raw_url_data = url_res.json()["data"]
-            # data = [{"url": and "visits":}]
+            try:
+                # top urls
+                url_res = hx.get(f"{API_BASE_URL}/top-urls", headers=headers, params={"days_ago": days_filter, "top": top_n_filter}, timeout=10.0)
+                url_res.raise_for_status()
+                raw_url_data = url_res.json()["data"]
+                # data = [{"url": and "visits":}]
 
-            if(len(raw_url_data)>0):
-                df=pd.DataFrame(raw_url_data)
-                # a data frame of url and visits
-            
-            # reverse the order so the highest number is at the top of the chart
-                df = df.sort_values(by="visits", ascending=True)
+                if(len(raw_url_data)>0):
+                    df=pd.DataFrame(raw_url_data)
+                    # a data frame of url and visits
+                
+                # reverse the order so the highest number is at the top of the chart
+                    df = df.sort_values(by="visits", ascending=True)
 
-            # bar chart using plotly
-                fig = px.bar(
-                    data_frame=df, 
-                    x="visits",       # no of visits -> length on bar
-                    y="url",          # url is label for the bars
-                    orientation="h",  # h -> horizontal
-                    color="visits",   # auto color bar based on size
-                    color_continuous_scale="Viridis" # Professional color scale
-                )
-                
-                fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)"),
-                    yaxis=dict(showgrid=False),
-                    margin=dict(l=0, r=0, t=20, b=0)
-                )
-                
-            # use streamlit to render chart
-                st.plotly_chart(fig, width="stretch")
-                
-            else:
-                st.info(f"No URLs found for the last {days_filter} days.") 
-
-                
+                # bar chart using plotly
+                    fig = px.bar(
+                        data_frame=df, 
+                        x="visits",       # no of visits -> length on bar
+                        y="url",          # url is label for the bars
+                        orientation="h",  # h -> horizontal
+                        color="visits",   # auto color bar based on size
+                        color_continuous_scale="Viridis" # Professional color scale
+                    )
+                    
+                    fig.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.2)"),
+                        yaxis=dict(showgrid=False),
+                        margin=dict(l=0, r=0, t=20, b=0)
+                    )
+                    
+                # use streamlit to render chart
+                    st.plotly_chart(fig, width="stretch")
+                    
+                else:
+                    st.info(f"No URLs found for the last {days_filter} days.") 
+                    
+            except hx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    st.warning("The API is currently rate-limited due to heavy traffic. Please wait a minute and try again.")
+                else:
+                    st.error(f"API returned an error: {e.response.status_code}")
+            except hx.ConnectError:
+                st.error("Critical Error, Cant Connect To Api")
