@@ -176,16 +176,18 @@ For the zero-cost path, point `.env` at a [Neon.tech](https://neon.tech) Postgre
 
 ## Performance
 
-Load tested with [Grafana k6](https://k6.io) using 70 concurrent virtual users across 15 tenants on a `t2.micro`.
+Load tested with [Grafana k6](https://k6.io) using 70 concurrent virtual users across 15 tenants on a free-tier AWS EC2 `t2.micro` (utilizing 2 vCPUs)..
+Also intentionally added 16th rogue tenant with wrong credentials
 
 | Metric | Result |
 |--------|--------|
-| Total requests (5 min) | ~40,391 |
-| Sustained throughput | **134.5 req/sec** |
-| Ingestion latency p(95) | **45.0 ms** |
-| True error rate | ~0% |
+| Total requests (5 min) | **84,177** |
+| Sustained throughput | **~280 req/sec** |
+| Average ingestion latency | **~60 ms** |
+| 500 Server Error | **0%** |
+| 429 Too Many Requests | **~18%** (Rate limited) |
+| 401 Unauthorized | **~5%** (Rogue tenant) |
 
-> IMP NOTE: We observed an error rate of 37.8% in raw results, which is exclusively due to `429 Too Many Requests` from the rate limiter working correctly — not application failures.
 
 ---
 
