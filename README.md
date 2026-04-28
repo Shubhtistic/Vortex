@@ -23,7 +23,7 @@ Companies pay thousands of dollars a month to Segment, Mixpanel, and PostHog jus
 - **Multi-tenant by design** — every tenant gets isolated public/secret API key pairs. Data is strictly scoped per tenant at the query level.
 - **Per-tenant rate limiting** — atomic Redis counters enforce request limits before any payload is written to PostgreSQL.
 - **Separation of powers** — Public Keys can only write. Secret Keys can only read. Enforced at the endpoint level.
-- **Runs on free-tier hardware** — verified at 136.5 req/sec sustained on an AWS EC2 `t2.micro`.
+- **Runs on free-tier hardware** — verified at 280+ reqs/sec sustained on an AWS EC2 `t2.micro`.
 
 ---
 
@@ -92,6 +92,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_password_here
 POSTGRES_DB=vortex_db
 REDIS_URL=redis://redis:6379/0
+REDIS_HOST=your_redis_hostname
 DOCS_ENDPOINT=your_docs_secret_here
 ```
 
@@ -177,7 +178,7 @@ For the zero-cost path, point `.env` at a [Neon.tech](https://neon.tech) Postgre
 ## Performance
 
 Load tested with [Grafana k6](https://k6.io) using 70 concurrent virtual users across 15 tenants on a free-tier AWS EC2 `t2.micro` (utilizing 2 vCPUs)..
-Also intentionally added 16th rogue tenant with wrong credentials
+Also intentionally added 16th rogue tenant with wrong credentials.
 
 | Metric | Result |
 |--------|--------|
