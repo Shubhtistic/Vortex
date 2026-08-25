@@ -1,0 +1,15 @@
+# --- uv / Python ---
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- env files ---
+.env
+*.env
+!example.env
