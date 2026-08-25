@@ -1,0 +1,42 @@
+from uuid import UUID
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .models import User
+from .repository import UserRepository
+from .exceptions import UserAlreadyExistsError, UserNotFoundError
+
+
+class UserService:
+    @staticmethod
+    async def create_user(db_session: AsyncSession, user_data: dict) -> User:
+
+        # user_data validated + password already hashed by caller (auth/organizations service layer)
+
+        if await UserRepository.check_by_email(
+            db_session=db_session, email=user_data["email"]
+        ):
+            raise UserAlreadyExistsError(email=user_data["email"])
+
+        new_user = await UserRepository.create_user(
+            db_session=db_session, instance=User(**user_data)
+        )
+        return new_user
+
+    @staticmethod
+    async def get_by_email(db_session: AsyncSession, email: str) -> User:
+        user = await UserRepository.get_by_email(db_session=db_session, email=email)
+        if user is None:
+            raise UserNotFoundError(identifier=email)
+        return user
+
+    @staticmethod
+    async def get_by_email_or_none(db_session: AsyncSession, email: str) -> User | None:
+        # used by organizations/service.py's invite flow — needs to check existence WITHoT raising
+        return await UserRepository.get_by_email(db_session=db_session, email=email)
+
+    @staticmethod
+    async def get_by_id(db_session: AsyncSession, user_id: UUID) -> User:
+        user = await UserRepository.get_by_id(db_session=db_session, user_id=user_id)
+        if user is None:
+            raise UserNotFoundError(identifier=str(user_id))
+        return user
