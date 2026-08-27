@@ -1,0 +1,11 @@
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+*.swp
+
+# --- Docs build artifacts ---
+docs/_build/
+docs/.docusaurus/
