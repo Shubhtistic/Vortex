@@ -112,11 +112,11 @@ class JwtSettings(CommonSettings):
     algorithm: str = Field(
         validation_alias="ALGORITHM",
     )
-    access_token_expire_minutes: int = Field(
-        validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES"
+    access_token_expire_seconds: int = Field(
+        validation_alias="ACCESS_TOKEN_EXPIRE_SECONDS"
     )
-    refresh_token_expire_minutes: int = Field(
-        validation_alias="REFRESH_TOKEN_EXPIRE_MINUTES"
+    refresh_token_expire_seconds: int = Field(
+        validation_alias="REFRESH_TOKEN_EXPIRE_SECONDS"
     )
 
 

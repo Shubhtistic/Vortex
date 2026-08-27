@@ -114,6 +114,6 @@ async def check_exists(
     return result.scalar() is not None
 
 
-async def get_one_by_query(q:select, db_session:AsyncSession):
-    result =await db_session.execute(q)
+async def get_one_by_query(q: select, db_session: AsyncSession):
+    result = await db_session.execute(q)
     return result.scalar_one_or_none()
