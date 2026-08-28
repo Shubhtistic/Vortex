@@ -25,4 +25,6 @@ class User(SQLModel, table=True):
             DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc)
         ),
     )
-    deleted_at:Optional[datetime]=Field(default=None,sa_column=Column(DateTime(timezone=True)))
+    deleted_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True))
+    )

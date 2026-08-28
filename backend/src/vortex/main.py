@@ -30,4 +30,3 @@ async def http_exception_handler(request, exc: HTTPException):
 @app.get("/", include_in_schema=False)
 async def scalar():
     return get_scalar_api_reference(openapi_url=app.openapi_url)
-
