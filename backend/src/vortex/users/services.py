@@ -21,22 +21,3 @@ class UserService:
             db_session=db_session, instance=User(**user_data)
         )
         return new_user
-
-    @staticmethod
-    async def get_by_email(db_session: AsyncSession, email: str) -> User:
-        user = await UserRepository.get_by_email(db_session=db_session, email=email)
-        if user is None:
-            raise UserNotFoundError(identifier=email)
-        return user
-
-    @staticmethod
-    async def get_by_email_or_none(db_session: AsyncSession, email: str) -> User | None:
-        # used by organizations/service.py's invite flow — needs to check existence WITHoT raising
-        return await UserRepository.get_by_email(db_session=db_session, email=email)
-
-    @staticmethod
-    async def get_by_id(db_session: AsyncSession, user_id: UUID) -> User:
-        user = await UserRepository.get_by_id(db_session=db_session, user_id=user_id)
-        if user is None:
-            raise UserNotFoundError(identifier=str(user_id))
-        return user

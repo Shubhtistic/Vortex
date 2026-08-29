@@ -17,17 +17,3 @@ class UserRepository:
     @staticmethod
     async def create_user(db_session: AsyncSession, instance: User) -> User:
         return await create(instance=instance, db_session=db_session)
-
-    @staticmethod
-    async def get_by_email(db_session: AsyncSession, email: str) -> Optional[User]:
-
-        stmt = select(User).where(User.email == email, User.is_active == True)
-
-        return await get_one_by_query(q=stmt, db_session=db_session)
-
-    @staticmethod
-    async def get_by_id(db_session: AsyncSession, user_id: UUID) -> Optional[User]:
-
-        stmt = select(User).where(User.id == user_id, User.is_active == True)
-
-        return await get_one_by_query(q=stmt, db_session=db_session)
