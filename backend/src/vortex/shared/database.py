@@ -50,7 +50,7 @@ async def get_db_session():
             raise
 
 
-async def get_session_factory():
+def get_session_factory():
     return SessionFactory
 
 
