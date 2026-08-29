@@ -72,7 +72,7 @@ class OrganizationMembership(SQLModel, table=True):
             "uq_one_owner_per_org",
             "organization_id",
             unique=True,
-            postgresql_where=(Column("role") == MembershipRole.owner)
+            postgresql_where=(Column("role") == "owner")
             & (Column("is_active") == True),
         ),
         # an email/user can be an ACTIVE owner in at most one org, globally
@@ -80,7 +80,7 @@ class OrganizationMembership(SQLModel, table=True):
             "uq_owner_globally_unique_per_user",
             "user_id",
             unique=True,
-            postgresql_where=(Column("role") == MembershipRole.owner)
+            postgresql_where=(Column("role") == "owner")
             & (Column("is_active") == True),
         ),
     )
