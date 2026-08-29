@@ -49,6 +49,7 @@ async def get_db_session():
             await db_session.rollback()
             raise
 
+
 async def get_session_factory():
     return SessionFactory
 
@@ -121,12 +122,13 @@ async def get_one_by_query(q: select, db_session: AsyncSession):
     result = await db_session.execute(q)
     return result.scalar_one_or_none()
 
+
 async def execute_query(
     stmt,
     db_session: AsyncSession,
 ):
     """caller must interpret the result
-       one_or_none(), all(), scalar(), etc -> since the shape varies per query and this helper can't assume one"""
+    one_or_none(), all(), scalar(), etc -> since the shape varies per query and this helper can't assume one
+    """
 
-    
     return await db_session.execute(stmt)
