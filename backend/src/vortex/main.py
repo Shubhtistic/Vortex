@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 
 from src.vortex.shared.responses import ApiResponse
 from src.vortex.shared.redis_client import init_redis, close_redis
-
+from src.vortex.api.routers import router as api_router
 
 # --- lifespan handler ---
 @asynccontextmanager
@@ -24,6 +24,13 @@ app = FastAPI(lifespan=lifespan)
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):
     return ApiResponse.error(message=exc.detail, code=exc.status_code)
+
+
+# --- imports routers ---
+
+app.include_router(api_router)
+
+
 
 
 # --- scalar docs ---
