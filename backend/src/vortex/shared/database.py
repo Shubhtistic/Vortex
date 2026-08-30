@@ -124,11 +124,11 @@ async def get_one_by_query(q: select, db_session: AsyncSession):
 
 
 async def execute_query(
-    stmt,
+    query,
     db_session: AsyncSession,
 ):
     """caller must interpret the result
     one_or_none(), all(), scalar(), etc -> since the shape varies per query and this helper can't assume one
     """
 
-    return await db_session.execute(stmt)
+    return await db_session.execute(query)
