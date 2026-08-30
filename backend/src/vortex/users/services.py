@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import User
@@ -20,3 +22,13 @@ class UserService:
             db_session=db_session, instance=User(**user_data)
         )
         return new_user
+
+    @staticmethod
+    async def get_by_email(db_session: AsyncSession, email: str) -> Optional[User]:
+
+        if not (
+            user := UserRepository.get_by_email(db_session=db_session, email=email)
+        ):
+            return UserNotFoundError(identifier=email)
+
+        return user
