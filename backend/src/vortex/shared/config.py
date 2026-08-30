@@ -115,9 +115,6 @@ class JwtSettings(CommonSettings):
     access_token_expire_seconds: int = Field(
         validation_alias="ACCESS_TOKEN_EXPIRE_SECONDS"
     )
-    refresh_token_expire_seconds: int = Field(
-        validation_alias="REFRESH_TOKEN_EXPIRE_SECONDS"
-    )
 
 
 # --- Main Settings ---
