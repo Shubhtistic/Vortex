@@ -10,6 +10,8 @@ T = TypeVar("T")
 class ApiResponse(Response):
     """global api response class for entire project"""
 
+    media_type = "application/json"
+
     def __init__(self, content: dict, status_code: int) -> None:
         super().__init__(content=content, status_code=status_code)
 
