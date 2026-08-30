@@ -6,7 +6,7 @@ from src.vortex.users.models import User
 from src.vortex.organizations.enums import MembershipRole
 
 from .models import Organization, OrganizationMembership
-from src.vortex.shared.database import check_exists, create, execute_query
+from src.vortex.shared.database import check_exists, create, execute_query, get_one_by_query
 
 
 class OrganizationRepository:
@@ -24,9 +24,10 @@ class OrganizationRepository:
 
     @staticmethod
     async def get_by_slug(db_session: AsyncSession, slug: str) -> Organization | None:
-        stmt = select(Organization).where(Organization.slug == slug)
-        result = await db_session.execute(stmt)
-        return result.scalar_one_or_none()
+
+        stmt = select(Organization).where(Organization.slug == slug, Organization.is_active==True)
+
+        return get_one_by_query(stmt,db_session)
 
 
 class MembershipRepository:
@@ -44,8 +45,8 @@ class MembershipRepository:
             OrganizationMembership.organization_id == org_id,
             OrganizationMembership.user_id == user_id,
         )
-        result = await db_session.execute(stmt)
-        return result.scalar_one_or_none()
+        
+        return get_one_by_query(stmt,db_session)
 
     @staticmethod
     async def get_invite_precheck_row(
