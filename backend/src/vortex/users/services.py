@@ -27,7 +27,9 @@ class UserService:
     async def get_by_email(db_session: AsyncSession, email: str) -> Optional[User]:
 
         if not (
-            user := UserRepository.get_by_email(db_session=db_session, email=email)
+            user := await UserRepository.get_by_email(
+                db_session=db_session, email=email
+            )
         ):
             return UserNotFoundError(identifier=email)
 

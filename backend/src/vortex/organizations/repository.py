@@ -34,7 +34,7 @@ class OrganizationRepository:
             Organization.slug == slug, Organization.is_active == True
         )
 
-        return get_one_by_query(stmt, db_session)
+        return await get_one_by_query(stmt, db_session)
 
 
 class MembershipRepository:
@@ -53,7 +53,7 @@ class MembershipRepository:
             OrganizationMembership.user_id == user_id,
         )
 
-        return get_one_by_query(stmt, db_session)
+        return await get_one_by_query(stmt, db_session)
 
     @staticmethod
     async def get_invite_precheck_row(

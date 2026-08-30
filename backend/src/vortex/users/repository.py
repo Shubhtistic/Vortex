@@ -22,4 +22,4 @@ class UserRepository:
     async def get_by_email(db_session: AsyncSession, email: str) -> Optional[User]:
         qry = select(User).where(User.email == email, User.is_active == True)
 
-        return get_one_by_query(qry, db_session)
+        return await get_one_by_query(qry, db_session)
