@@ -1,7 +1,7 @@
-import Hero from '@components/Hero'
-import Navbar from '@app/layout/Navbar'
+import Navbar from '@/components/Navbar'
+import Hero from '@/components/Hero'
 
-export default function LandingPage() {
+export default function HomePage() {
   return (
     <div className="relative">
       <Navbar />

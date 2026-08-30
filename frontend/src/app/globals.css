@@ -1,6 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme inline {
+  --color-brand: #06b6d4;
+  --color-brand-dark: #0e7490;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
 
 @layer base {
   html {
@@ -9,7 +13,7 @@
 
   body {
     @apply bg-slate-950 text-white;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-sans);
     margin: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

@@ -1,5 +1,7 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-// @ts-nocheck - PixelBlast is a third-party component from React Bits
+
+// @ts-nocheck
+'use client'
+
 import { Effect, EffectComposer, EffectPass, RenderPass } from 'postprocessing';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
@@ -308,7 +310,7 @@ const PixelBlast = ({
   pixelSize = 3,
   color = '#B497CF',
   className = '',
-  style,
+  style = {},
   antialias = true,
   patternScale = 2,
   patternDensity = 1,
@@ -380,8 +382,8 @@ const PixelBlast = ({
         uColor: { value: new THREE.Color(color) },
         uClickPos: {
           value: Array.from({ length: MAX_CLICKS }, () => new THREE.Vector2(-1, -1))
-        } as unknown as THREE.Uniform<THREE.Vector2[]|Float32Array>,
-        uClickTimes: { value: new Float32Array(MAX_CLICKS) } as unknown as THREE.Uniform<THREE.Vector2[]|Float32Array>,
+        } as unknown as THREE.Uniform<any>,
+        uClickTimes: { value: new Float32Array(MAX_CLICKS) } as unknown as THREE.Uniform<any>,
         uShapeType: { value: SHAPE_MAP[variant] ?? 0 },
         uPixelSize: { value: pixelSize * renderer.getPixelRatio() },
         uScale: { value: patternScale },
@@ -539,7 +541,7 @@ const PixelBlast = ({
       };
     } else {
       const t = threeRef.current;
-      if (!t) return; // Add null check for t
+      if (!t) return;
       t.uniforms.uShapeType.value = SHAPE_MAP[variant] ?? 0;
       t.uniforms.uPixelSize.value = pixelSize * t.renderer.getPixelRatio();
       t.uniforms.uColor.value.set(color);

@@ -1,16 +1,14 @@
+'use client'
+
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setIsScrolled(true)
-      } else {
-        setIsScrolled(false)
-      }
+      setIsScrolled(window.scrollY > 50)
     }
 
     window.addEventListener('scroll', handleScroll)
@@ -25,14 +23,14 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300">
       <div className={containerClasses}>
         <div className="flex justify-between items-center py-4">
-          <Link to="/" className="text-white text-xl font-bold">
+          <Link href="/" className="text-white text-xl font-bold">
             Vortex
           </Link>
           <div className="space-x-4">
-            <Link to="/login" className="text-white hover:text-gray-200">
+            <Link href="/login" className="text-white hover:text-gray-200">
               Login
             </Link>
-            <Link to="/signup" className="text-white hover:text-gray-200">
+            <Link href="/signup" className="text-white hover:text-gray-200">
               Sign Up
             </Link>
           </div>

@@ -1,8 +1,13 @@
+'use client'
+
 import PixelBlast from './PixelBlast'
 
 export default function Hero() {
   return (
-    <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
+    <div
+      style={{ width: '100%', height: '100vh', position: 'relative' }}
+      className="bg-slate-950"
+    >
       <PixelBlast
         variant="circle"
         pixelSize={3}
@@ -21,8 +26,6 @@ export default function Hero() {
         speed={0.6}
         edgeFade={0.25}
         transparent
-        className=""
-        style={{}}
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10">
         <h1 className="text-6xl font-bold">Vortex</h1>
