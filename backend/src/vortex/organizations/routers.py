@@ -18,7 +18,7 @@ router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 @router.post("/signup")
 async def signup(payload: SignupRequest):
-    session_factory=get_session_factory()
+    session_factory = get_session_factory()
     async with session_factory() as db_session:
         try:
             # payload auto validated

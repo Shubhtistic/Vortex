@@ -6,6 +6,7 @@ from src.vortex.shared.responses import ApiResponse
 from src.vortex.shared.redis_client import init_redis, close_redis
 from src.vortex.api.routers import router as api_router
 
+
 # --- lifespan handler ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,8 +30,6 @@ async def http_exception_handler(request, exc: HTTPException):
 # --- imports routers ---
 
 app.include_router(api_router)
-
-
 
 
 # --- scalar docs ---
