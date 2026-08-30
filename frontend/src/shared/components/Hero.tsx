@@ -1,16 +1,11 @@
-import PixelBlast from '@components/PixelBlast';
+import PixelBlast from './PixelBlast'
 
-interface HeroProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-function Hero({ children, className = '' }: HeroProps) {
+export default function Hero() {
   return (
-    <div className={`relative w-full h-screen overflow-hidden ${className}`}>
+    <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
       <PixelBlast
         variant="circle"
-        pixelSize={6}
+        pixelSize={3}
         color="#06B6D4"
         patternScale={3}
         patternDensity={1.2}
@@ -26,12 +21,13 @@ function Hero({ children, className = '' }: HeroProps) {
         speed={0.6}
         edgeFade={0.25}
         transparent
+        className=""
+        style={{}}
       />
-      <div className="absolute inset-0 flex items-center justify-center">
-        {children}
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10">
+        <h1 className="text-6xl font-bold">Vortex</h1>
+        <p className="text-xl mt-4">Next-gen event tracking</p>
       </div>
     </div>
-  );
+  )
 }
-
-export default Hero;

@@ -21,9 +21,8 @@
       "@components/*": ["src/shared/components/*"],
       "@hooks/*": ["src/shared/hooks/*"],
       "@lib/*": ["src/shared/lib/*"],
-      "@types/*": ["src/shared/types/*"],
-      "@features/*": ["src/features/*"],
       "@app/*": ["src/app/*"],
+      "@pages/*": ["src/pages/*"],
       "@styles/*": ["src/styles/*"]
     }
   },
