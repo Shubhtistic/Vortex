@@ -4,9 +4,9 @@ import PixelBlast from './PixelBlast'
 
 export default function Hero() {
   return (
-    <div
+    <section
       style={{ width: '100%', height: '100vh', position: 'relative' }}
-      className="bg-slate-950"
+      className="bg-slate-950 overflow-hidden"
     >
       <PixelBlast
         variant="circle"
@@ -31,6 +31,6 @@ export default function Hero() {
         <h1 className="text-6xl font-bold">Vortex</h1>
         <p className="text-xl mt-4">Next-gen event tracking</p>
       </div>
-    </div>
+    </section>
   )
 }
