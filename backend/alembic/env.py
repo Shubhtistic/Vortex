@@ -10,7 +10,6 @@ from sqlmodel import SQLModel
 from src.vortex.shared.db_registry import *
 from src.vortex.shared.config import get_settings
 
-
 config = context.config
 
 # Interpret the config file for Python logging.
@@ -43,7 +42,7 @@ def run_migrations_offline() -> None:
 
     """
 
-    settings=get_settings()
+    settings = get_settings()
     url = settings.postgres.postgres_async_url
     context.configure(
         url=url,
@@ -68,7 +67,7 @@ async def run_async_migrations() -> None:
     and associate a connection with the context.
 
     """
-    settings=get_settings()
+    settings = get_settings()
 
     connectable = create_async_engine(
         url=settings.postgres.postgres_async_url,
