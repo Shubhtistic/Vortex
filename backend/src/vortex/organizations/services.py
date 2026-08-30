@@ -76,8 +76,8 @@ class OrganizationService:
                 user_data={
                     "email": payload.email,
                     "hashed_password": hash_password(payload.password),
-                    "first_name": None,
-                    "last_name": None,
+                    "first_name": payload.first_name,
+                    "last_name": payload.last_name,
                 },
             )
             target_user_id = target_user.id

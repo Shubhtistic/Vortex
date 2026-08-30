@@ -31,6 +31,6 @@ class UserService:
                 db_session=db_session, email=email
             )
         ):
-            return UserNotFoundError(identifier=email)
+            raise UserNotFoundError(identifier=email)
 
         return user

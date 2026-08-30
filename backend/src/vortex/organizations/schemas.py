@@ -14,6 +14,8 @@ class SignupRequest(BaseModel):
 
 
 class InviteMemberRequest(BaseModel):
+    first_name: str
+    last_name: str
     password: str
     email: EmailStr
     role: InviteMembershipRole  # only "admin" or "analyst" accepted

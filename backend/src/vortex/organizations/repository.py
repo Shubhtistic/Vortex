@@ -94,5 +94,5 @@ class MembershipRepository:
             already_member_subq.label("already_member"),
         ).where(User.email == email)
 
-        result = await execute_query(stmt=stmt, db_session=db_session)
+        result = await execute_query(query=stmt, db_session=db_session)
         return result.one_or_none()
