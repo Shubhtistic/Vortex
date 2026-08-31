@@ -1,7 +1,7 @@
 from typing import Annotated, TypeVar
 
 from fastapi import Depends
-from sqlalchemy import delete, select
+from sqlalchemy import Select, delete, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -82,7 +82,7 @@ async def get_one(
 
 
 async def get_all(
-    stmt,
+    stmt: Select,
     db_session: AsyncSession,
 ) -> list[Model]:
     """Fetch all rows. Pass pre-built query statement from upper layer."""
@@ -118,7 +118,7 @@ async def check_exists(
     return result.scalar() is not None
 
 
-async def get_one_by_query(q: select, db_session: AsyncSession):
+async def get_one_by_query(q: Select, db_session: AsyncSession):
     result = await db_session.execute(q)
     return result.scalar_one_or_none()
 

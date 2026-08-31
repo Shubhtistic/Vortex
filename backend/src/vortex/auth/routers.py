@@ -120,4 +120,4 @@ async def logout(
         ttl_seconds=ttl_seconds,
     )
 
-    return ApiResponse.success(message="Logged Out",code=204)
+    return ApiResponse.success(message="Logged Out", code=204)
