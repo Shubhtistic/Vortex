@@ -4,7 +4,7 @@ from src.vortex.shared.responses import ApiResponse
 from src.vortex.shared.database import DbSessionDep
 from src.vortex.auth.dependencies import CurrentUserDep, VerifiedAdminDep
 
-from .exceptions import SlugAlreadyExistsErorr, NoTenantsFoundError
+from .exceptions import SlugAlreadyExistsErorr
 from .services import TenantService
 from .schemas import CreateTenantRequest
 
