@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # --- Common ---
 class CommonSettings(BaseSettings):
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -17,6 +18,7 @@ class CommonSettings(BaseSettings):
 
 # --- Postgres ---
 class PostgresSettings(CommonSettings):
+
     postgres_server: str = Field(
         validation_alias="POSTGRES_SERVER",
     )
@@ -51,6 +53,7 @@ class PostgresSettings(CommonSettings):
 
 # --- Redis ---
 class RedisSettings(CommonSettings):
+
     redis_host: str = Field(
         validation_alias="REDIS_HOST",
     )
@@ -91,6 +94,7 @@ class RedisSettings(CommonSettings):
 
 # --- App settings ---
 class AppSettings(CommonSettings):
+
     project_name: str = Field(
         default="SonClarus",
         validation_alias="PROJECT_NAME",
@@ -105,8 +109,19 @@ class AppSettings(CommonSettings):
     )
 
 
+# --- Project Settings ---
+class ProjectSettings(CommonSettings):
+
+    api_key_prefix: str = Field(
+        validation_alias="API_KEY_PREFIX",
+    )
+
+    grace_period_mins: int = Field(validate_alias="GRACE_PERIOD_MINS")
+
+
 # --- Jwt Auth ---
 class JwtSettings(CommonSettings):
+
     private_key: SecretStr = Field(validation_alias="JWT_PRIVATE_KEY")
     public_key: str = Field(validation_alias="JWT_PUBLIC_KEY")
     algorithm: str = Field(
@@ -117,23 +132,39 @@ class JwtSettings(CommonSettings):
     )
 
 
+# --- CORS ---
+class CORSSettings(CommonSettings):
+
+    allowed_origins: list[str] = Field(
+        validation_alias="ALLOWED_ORIGINS",
+    )
+
+    allowed_methods: list[str] = Field(
+        validation_alias="ALLOWED_METHODS",
+    )
+
+    allowed_headers: list[str] = Field(
+        validation_alias="ALLOWED_HEADERS",
+    )
+
+    allow_credentials: bool = Field(
+        validation_alias="ALLOW_CREDENTIALS",
+    )
+
+    max_age: int = Field(
+        validation_alias="CORS_MAX_AGE",
+    )
+
+
 # --- Main Settings ---
 class Settings(CommonSettings):
-    postgres: PostgresSettings = Field(
-        default_factory=PostgresSettings,
-    )
 
-    redis: RedisSettings = Field(
-        default_factory=RedisSettings,
-    )
-
-    app: AppSettings = Field(
-        default_factory=AppSettings,
-    )
-
-    jwt: JwtSettings = Field(
-        default_factory=JwtSettings,
-    )
+    postgres: PostgresSettings = Field(default_factory=PostgresSettings)
+    redis: RedisSettings = Field(default_factory=RedisSettings)
+    app: AppSettings = Field(default_factory=AppSettings)
+    jwt: JwtSettings = Field(default_factory=JwtSettings)
+    project: ProjectSettings = Field(default_factory=ProjectSettings)
+    cors: CORSSettings = Field(default_factory=CORSSettings)
 
 
 @lru_cache

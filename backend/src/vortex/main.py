@@ -2,10 +2,12 @@ from contextlib import asynccontextmanager
 from fastapi.exceptions import RequestValidationError
 from scalar_fastapi import get_scalar_api_reference
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.vortex.shared.responses import ApiResponse
 from src.vortex.shared.redis_client import init_redis, close_redis
 from src.vortex.api.routers import router as api_router
+from src.vortex.shared.config import get_settings
 
 
 # --- lifespan handler ---
@@ -41,6 +43,20 @@ async def validation_handler(request: Request, exc: RequestValidationError):
             "errors": exc.errors(),
         },
     )
+
+
+# --- Cors Middleware Policy ---
+
+settings = get_settings()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors.allowed_origins,
+    allow_methods=settings.cors.allowed_methods,
+    allow_headers=settings.cors.allowed_headers,
+    allow_credentials=settings.cors.allow_credentials,
+    max_age=settings.cors.max_age,
+)
 
 
 # --- imports routers ---
