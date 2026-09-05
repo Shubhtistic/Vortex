@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.vortex.shared.database import create, check_exists, get_all
 
-from .models import Tenant
+from .models import ApiKey, Tenant
 
 
 class TenantRepository:
@@ -33,3 +33,22 @@ class TenantRepository:
         query = select(Tenant).where(Tenant.organization_id == org_id)
 
         return await get_all(stmt=query, db_session=db_session)
+
+
+class ApiKeyRepository:
+    @staticmethod
+    async def create_api_key(
+        api_key_instance: ApiKey, db_session: AsyncSession
+    ) -> ApiKey:
+
+        return await create(instance=api_key_instance, db_session=db_session)
+
+    @staticmethod
+    async def check_by_api_key_slug(
+        api_key_slug: str, tenant_id: str, db_session: AsyncSession
+    ) -> bool:
+        return await check_exists(
+            model=ApiKey,
+            db_session=db_session,
+            filters={"api_key_slug": api_key_slug, "tenant_id": tenant_id},
+        )
