@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { DM_Mono, Syne } from 'next/font/google'
-import Providers from './providers'
 import './globals.css'
 
 const syne = Syne({
@@ -28,10 +27,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${syne.variable} ${dmMono.variable}`} suppressHydrationWarning>
-      <body>
-        <Providers>{children}</Providers>
-      </body>
+    <html lang="en" className={`${syne.variable} ${dmMono.variable} dark`}>
+      <body>{children}</body>
     </html>
   )
 }
