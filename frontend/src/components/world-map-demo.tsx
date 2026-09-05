@@ -1,6 +1,6 @@
-'use client'
+"use client"
 
-import WorldMap from '@/components/ui/world-map'
+import WorldMap from "@/components/ui/world-map"
 
 export default function WorldMapDemo() {
   return (
@@ -15,28 +15,32 @@ export default function WorldMapDemo() {
           <WorldMap
             dots={[
               {
-                start: { lat: 64.2008, lng: -149.4937 }, // Alaska (Fairbanks)
-                end: { lat: 34.0522, lng: -118.2437 }, // Los Angeles
+                start: { lat: 78.5074, lng: 190.1278, label: "Arctic Ocean, north of the Chukchi Sea" },
+                end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: 64.2008, lng: -149.4937 }, // Alaska (Fairbanks)
-                end: { lat: -15.7975, lng: -47.8919 }, // Brazil (Brasília)
+                start: { lat: -80.2008, lng: 250.4937, label: "Antarctica, Marie Byrd Land region" },
+                end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: -15.7975, lng: -47.8919 }, // Brazil (Brasília)
-                end: { lat: 38.7223, lng: -9.1393 }, // Lisbon
+                start: { lat: 64.2008, lng: -149.4937, label: "Interior Alaska, United States" },
+                end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: 51.5074, lng: -0.1278 }, // London
-                end: { lat: 28.6139, lng: 77.209 }, // New Delhi
+                start: { lat: -88.2008, lng: -110.4937, label: "Antarctica, near the South Pole" },
+                end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: 28.6139, lng: 77.209 }, // New Delhi
-                end: { lat: 43.1332, lng: 131.9113 }, // Vladivostok
+                start: { lat: 120.2008, lng: -89.4937, label: "No real-world location: latitude exceeds 90° N" },
+                end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: 28.6139, lng: 77.209 }, // New Delhi
-                end: { lat: -1.2921, lng: 36.8219 }, // Nairobi
+                start: { lat: -75.2008, lng: 88.4937, label: "East Antarctica, inland ice sheet" },
+                end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
+              },
+              {
+                start: { lat: 400.2008, lng: 270.4937, label: "No real-world location: latitude exceeds 90° N" },
+                end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
             ]}
           />

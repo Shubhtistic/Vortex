@@ -1,7 +1,7 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import Link from "next/link"
+import { useEffect, useState } from "react"
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -10,14 +10,12 @@ export default function Navbar() {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50)
     }
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
   const pillClass = `mx-auto transition-all duration-300 max-w-5xl px-8 ${
-    isScrolled
-      ? 'bg-white/10 backdrop-blur-md rounded-full mt-4'
-      : 'bg-transparent mt-0'
+    isScrolled ? "bg-white/10 backdrop-blur-md rounded-full mt-4" : "bg-transparent mt-0"
   }`
 
   return (
@@ -28,10 +26,16 @@ export default function Navbar() {
             Vortex
           </Link>
           <div className="flex items-center space-x-4">
-            <Link href="/login" className="text-white/80 hover:text-white transition-colors duration-200">
+            <Link
+              href="/login"
+              className="text-white/80 hover:text-white transition-colors duration-200"
+            >
               Login
             </Link>
-            <Link href="/signup" className="text-white/80 hover:text-white transition-colors duration-200">
+            <Link
+              href="/signup"
+              className="text-white/80 hover:text-white transition-colors duration-200"
+            >
               Sign Up
             </Link>
           </div>

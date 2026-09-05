@@ -1,15 +1,21 @@
-'use client'
+"use client"
 
-import { useRef, useMemo } from 'react'
-import { motion } from 'motion/react'
-import Image from 'next/image'
-import DottedMap from 'dotted-map'
-import * as turf from '@turf/turf'
+import * as turf from "@turf/turf"
+import DottedMap from "dotted-map"
+import { motion } from "motion/react"
+import Image from "next/image"
+import { useMemo, useRef } from "react"
+
+interface Point {
+  lat: number
+  lng: number
+  label?: string
+}
 
 interface MapProps {
   dots?: Array<{
-    start: { lat: number; lng: number; label?: string }
-    end: { lat: number; lng: number; label?: string }
+    start: Point
+    end: Point
   }>
   lineColor?: string
 }
@@ -20,40 +26,143 @@ const ARC_CURVE = 40 * ZOOM
 // Simplified land polygons (major continents in lat/lng)
 const LAND_POLYGONS = [
   // North America
-  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
-    [-170, 70], [-140, 72], [-100, 72], [-60, 65], [-55, 47], [-67, 44], [-80, 30],
-    [-100, 25], [-115, 32], [-125, 42], [-130, 55], [-165, 65], [-170, 70]
-  ]] }},
+  {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [-170, 70],
+          [-140, 72],
+          [-100, 72],
+          [-60, 65],
+          [-55, 47],
+          [-67, 44],
+          [-80, 30],
+          [-100, 25],
+          [-115, 32],
+          [-125, 42],
+          [-130, 55],
+          [-165, 65],
+          [-170, 70],
+        ],
+      ],
+    },
+  },
   // South America
-  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
-    [-80, 10], [-60, 12], [-35, -5], [-35, -20], [-50, -30], [-55, -35], [-70, -55],
-    [-75, -45], [-70, -20], [-80, 0], [-80, 10]
-  ]] }},
+  {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [-80, 10],
+          [-60, 12],
+          [-35, -5],
+          [-35, -20],
+          [-50, -30],
+          [-55, -35],
+          [-70, -55],
+          [-75, -45],
+          [-70, -20],
+          [-80, 0],
+          [-80, 10],
+        ],
+      ],
+    },
+  },
   // Europe
-  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
-    [-10, 60], [0, 65], [10, 62], [25, 70], [40, 68], [50, 55], [30, 45],
-    [10, 38], [-5, 36], [-10, 45], [-10, 60]
-  ]] }},
+  {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [-10, 60],
+          [0, 65],
+          [10, 62],
+          [25, 70],
+          [40, 68],
+          [50, 55],
+          [30, 45],
+          [10, 38],
+          [-5, 36],
+          [-10, 45],
+          [-10, 60],
+        ],
+      ],
+    },
+  },
   // Africa
-  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
-    [-15, 35], [10, 35], [30, 32], [50, 12], [50, -2], [40, -15], [35, -35],
-    [20, -35], [15, -5], [0, 5], [-15, 10], [-17, 25], [-15, 35]
-  ]] }},
+  {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [-15, 35],
+          [10, 35],
+          [30, 32],
+          [50, 12],
+          [50, -2],
+          [40, -15],
+          [35, -35],
+          [20, -35],
+          [15, -5],
+          [0, 5],
+          [-15, 10],
+          [-17, 25],
+          [-15, 35],
+        ],
+      ],
+    },
+  },
   // Asia
-  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
-    [30, 70], [60, 72], [100, 70], [140, 60], [150, 50], [140, 35], [120, 20],
-    [100, 10], [80, 10], [70, 25], [50, 35], [30, 45], [30, 70]
-  ]] }},
+  {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [30, 70],
+          [60, 72],
+          [100, 70],
+          [140, 60],
+          [150, 50],
+          [140, 35],
+          [120, 20],
+          [100, 10],
+          [80, 10],
+          [70, 25],
+          [50, 35],
+          [30, 45],
+          [30, 70],
+        ],
+      ],
+    },
+  },
   // Australia
-  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
-    [115, -15], [145, -12], [155, -25], [150, -38], [135, -38], [115, -30], [115, -15]
-  ]] }},
+  {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [115, -15],
+          [145, -12],
+          [155, -25],
+          [150, -38],
+          [135, -38],
+          [115, -30],
+          [115, -15],
+        ],
+      ],
+    },
+  },
 ]
 
 // Combine all land polygons into one MultiPolygon
-const ALL_LAND = turf.multiPolygon(
-  LAND_POLYGONS.map((p: any) => p.geometry.coordinates)
-)
+const ALL_LAND = turf.multiPolygon(LAND_POLYGONS.map((p: any) => p.geometry.coordinates))
 
 const projectPoint = (lat: number, lng: number) => {
   const baseX = (lng + 180) * (800 / 360)
@@ -65,7 +174,11 @@ const projectPoint = (lat: number, lng: number) => {
 }
 
 // Find nearest point on land using raster-like approach
-const findLandPoint = (lat: number, lng: number, maxIter: number = 20): { lat: number; lng: number } => {
+const findLandPoint = (
+  lat: number,
+  lng: number,
+  maxIter: number = 20
+): { lat: number; lng: number } => {
   let currentLat = lat
   let currentLng = lng
   let step = 2 // degrees
@@ -78,7 +191,12 @@ const findLandPoint = (lat: number, lng: number, maxIter: number = 20): { lat: n
     // Move towards nearest land (try all directions)
     let bestPoint = null
     let bestDist = Infinity
-    for (const [dLat, dLng] of [[-step, 0], [step, 0], [0, -step], [0, step]]) {
+    for (const [dLat, dLng] of [
+      [-step, 0],
+      [step, 0],
+      [0, -step],
+      [0, step],
+    ]) {
       const candidate = turf.point([currentLng + dLng, currentLat + dLat])
       if (turf.booleanPointInPolygon(candidate as any, ALL_LAND as any)) {
         const dist = Math.sqrt(dLat * dLat + dLng * dLng)
@@ -99,33 +217,27 @@ const findLandPoint = (lat: number, lng: number, maxIter: number = 20): { lat: n
   return { lat: currentLat, lng: currentLng }
 }
 
-export default function WorldMap({
-  dots = [],
-  lineColor = '#0ea5e9',
-}: MapProps) {
+export default function WorldMap({ dots = [], lineColor = "#0ea5e9" }: MapProps) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const map = new DottedMap({ height: 100, grid: 'diagonal' })
+  const map = new DottedMap({ height: 100, grid: "diagonal" })
 
   const svgMap = map.getSVG({
     radius: 0.22,
-    color: '#FFFFFF40',
-    shape: 'circle',
-    backgroundColor: 'black',
+    color: "#FFFFFF40",
+    shape: "circle",
+    backgroundColor: "black",
   })
 
   // Fix dots to ensure they're on land (computed synchronously)
   const landDots = useMemo(() => {
-    return dots.map(dot => ({
+    return dots.map((dot) => ({
       ...dot,
       start: findLandPoint(dot.start.lat, dot.start.lng),
       end: findLandPoint(dot.end.lat, dot.end.lng),
     }))
   }, [dots])
 
-  const createCurvedPath = (
-    start: { x: number; y: number },
-    end: { x: number; y: number }
-  ) => {
+  const createCurvedPath = (start: { x: number; y: number }, end: { x: number; y: number }) => {
     const midX = (start.x + end.x) / 2
     const midY = Math.min(start.y, end.y) - ARC_CURVE
     return `M ${start.x} ${start.y} Q ${midX} ${midY} ${end.x} ${end.y}`
@@ -174,7 +286,7 @@ export default function WorldMap({
               transition={{
                 duration: 1.0,
                 delay: 1.0 + i * 0.2,
-                ease: 'easeInOut',
+                ease: "easeInOut",
               }}
             />
           )
@@ -187,8 +299,22 @@ export default function WorldMap({
             <g key={`start-${i}`} style={{ animation: `fadeIn 0.4s ease ${0.4 + i * 0.08}s both` }}>
               <circle cx={s.x} cy={s.y} r="3" fill={lineColor} />
               <circle cx={s.x} cy={s.y} r="3" fill={lineColor} opacity="0.5">
-                <animate attributeName="r" from="3" to="10" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
-                <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
+                <animate
+                  attributeName="r"
+                  from="3"
+                  to="10"
+                  dur="1.5s"
+                  begin={`${0.4 + i * 0.08}s`}
+                  repeatCount="indefinite"
+                />
+                <animate
+                  attributeName="opacity"
+                  from="0.5"
+                  to="0"
+                  dur="1.5s"
+                  begin={`${0.4 + i * 0.08}s`}
+                  repeatCount="indefinite"
+                />
               </circle>
             </g>
           )
@@ -201,8 +327,22 @@ export default function WorldMap({
             <g key={`end-${i}`} style={{ animation: `fadeIn 0.4s ease ${1.8 + i * 0.2}s both` }}>
               <circle cx={e.x} cy={e.y} r="3" fill={lineColor} />
               <circle cx={e.x} cy={e.y} r="3" fill={lineColor} opacity="0.5">
-                <animate attributeName="r" from="3" to="10" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
-                <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
+                <animate
+                  attributeName="r"
+                  from="3"
+                  to="10"
+                  dur="1.5s"
+                  begin={`${1.8 + i * 0.2}s`}
+                  repeatCount="indefinite"
+                />
+                <animate
+                  attributeName="opacity"
+                  from="0.5"
+                  to="0"
+                  dur="1.5s"
+                  begin={`${1.8 + i * 0.2}s`}
+                  repeatCount="indefinite"
+                />
               </circle>
             </g>
           )

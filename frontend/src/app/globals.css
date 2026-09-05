@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -16,7 +16,7 @@
   --color-dim: #22253a;
   --color-red: #f0565b;
   --color-blue: #4a9eff;
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
   --font-syne: var(--font-syne), sans-serif;
   --font-dm: var(--font-dm-mono), monospace;
 }
@@ -60,8 +60,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .nav-fade {
