@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios"
+import { isValidJwtFormat } from "./validation"
 
 const BASE_URL = "https://lubricate-flatness-foster.ngrok-free.dev"
 
@@ -69,7 +70,7 @@ api.interceptors.response.use(
       try {
         const res = await api.post("/auth/refresh")
         const newToken = res.data?.data?.access_token
-        if (newToken) {
+        if (newToken && isValidJwtFormat(newToken)) {
           setAccessToken(newToken)
           originalRequest.headers.Authorization = `Bearer ${newToken}`
           processQueue(null, newToken)

@@ -4,6 +4,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
+import {
+  isValidEmail,
+  isValidName,
+  isValidSlug,
+  sanitizeSignupPayload,
+  trim,
+} from "@/lib/validation"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -23,20 +30,62 @@ export default function SignupPage() {
     }
   }, [isAuthenticated, router])
 
+  const handleSlugChange = (raw: string) => {
+    setSlug(
+      trim(raw)
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-")
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setLoading(true)
 
+    const trimmedOrgName = trim(orgName)
+    const trimmedSlug = trim(slug)
+    const trimmedEmail = trim(email)
+    const trimmedPassword = trim(password)
+    const trimmedFirstName = trim(firstName)
+    const trimmedLastName = trim(lastName)
+
+    if (!trimmedOrgName || trimmedOrgName.length < 2) {
+      setError("Organization name must be at least 2 characters")
+      return
+    }
+    if (!trimmedSlug || !isValidSlug(trimmedSlug)) {
+      setError("Slug must be lowercase letters, numbers, and hyphens (e.g. acme-corp)")
+      return
+    }
+    if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+      setError("Invalid email address")
+      return
+    }
+    if (!trimmedPassword || trimmedPassword.length < 8) {
+      setError("Password must be at least 8 characters")
+      return
+    }
+    if (!trimmedFirstName || !isValidName(trimmedFirstName)) {
+      setError("Invalid first name")
+      return
+    }
+    if (!trimmedLastName || !isValidName(trimmedLastName)) {
+      setError("Invalid last name")
+      return
+    }
+
+    setLoading(true)
     try {
-      await signup({
-        org_name: orgName,
-        slug,
-        email,
-        password,
-        first_name: firstName,
-        last_name: lastName,
+      const sanitized = sanitizeSignupPayload({
+        org_name: trimmedOrgName,
+        slug: trimmedSlug,
+        email: trimmedEmail,
+        password: trimmedPassword,
+        first_name: trimmedFirstName,
+        last_name: trimmedLastName,
       })
+      await signup(sanitized)
       router.replace("/login")
     } catch (err: unknown) {
       const message =
@@ -82,6 +131,7 @@ export default function SignupPage() {
                 onChange={(e) => setFirstName(e.target.value)}
                 required
                 maxLength={100}
+                autoComplete="given-name"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
                 placeholder="Jane"
               />
@@ -100,6 +150,7 @@ export default function SignupPage() {
                 onChange={(e) => setLastName(e.target.value)}
                 required
                 maxLength={100}
+                autoComplete="family-name"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
                 placeholder="Doe"
               />
@@ -119,6 +170,8 @@ export default function SignupPage() {
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               required
+              maxLength={100}
+              autoComplete="organization"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
               placeholder="Acme Corp"
             />
@@ -135,9 +188,10 @@ export default function SignupPage() {
               id="slug"
               type="text"
               value={slug}
-              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+              onChange={(e) => handleSlugChange(e.target.value)}
               required
-              pattern="[a-z0-9-]+"
+              maxLength={50}
+              autoComplete="organization"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
               placeholder="acme-corp"
             />
@@ -159,6 +213,7 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
               placeholder="you@company.com"
             />
@@ -178,6 +233,7 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
+              autoComplete="new-password"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
               placeholder="Minimum 8 characters"
             />

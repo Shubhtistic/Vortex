@@ -2,6 +2,7 @@
 
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react"
 import api, { setAccessToken } from "./api"
+import { isValidJwtFormat, sanitizeLoginPayload, sanitizeSignupPayload } from "./validation"
 
 interface User {
   id: string
@@ -37,18 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessTokenState] = useState<string | null>(initialToken)
 
   useEffect(() => {
-    if (initialToken) {
+    if (initialToken && isValidJwtFormat(initialToken)) {
       setAccessToken(initialToken)
     }
   }, [initialToken])
 
   const login = useCallback(async (org_slug: string, email: string, password: string) => {
-    const res = await api.post("/auth/login", { org_slug, email, password })
+    const sanitized = sanitizeLoginPayload({ org_slug, email, password })
+    const res = await api.post("/auth/login", sanitized)
     const token = res.data?.data?.access_token
-    if (token) {
+    if (token && isValidJwtFormat(token)) {
       setAccessToken(token)
       setAccessTokenState(token)
       sessionStorage.setItem("access_token", token)
+    } else {
+      throw new Error("Invalid token received from server")
     }
   }, [])
 
@@ -61,7 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       first_name: string
       last_name: string
     }) => {
-      await api.post("/organizations/signup", payload)
+      const sanitized = sanitizeSignupPayload(payload)
+      await api.post("/organizations/signup", sanitized)
     },
     []
   )

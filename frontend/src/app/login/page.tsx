@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { isValidEmail, isValidSlug, sanitizeLoginPayload, trim } from "@/lib/validation"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -23,10 +24,32 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setLoading(true)
 
+    const trimmedSlug = trim(orgSlug)
+    const trimmedEmail = trim(email)
+    const trimmedPassword = trim(password)
+
+    if (!trimmedSlug || !isValidSlug(trimmedSlug)) {
+      setError("Invalid organization slug")
+      return
+    }
+    if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+      setError("Invalid email address")
+      return
+    }
+    if (!trimmedPassword || trimmedPassword.length < 8) {
+      setError("Password must be at least 8 characters")
+      return
+    }
+
+    setLoading(true)
     try {
-      await login(orgSlug, email, password)
+      const sanitized = sanitizeLoginPayload({
+        org_slug: trimmedSlug,
+        email: trimmedEmail,
+        password: trimmedPassword,
+      })
+      await login(sanitized.org_slug, sanitized.email, sanitized.password)
       router.replace("/")
     } catch (err: unknown) {
       const message =
@@ -70,6 +93,7 @@ export default function LoginPage() {
               value={orgSlug}
               onChange={(e) => setOrgSlug(e.target.value)}
               required
+              autoComplete="organization"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
               placeholder="my-org"
             />
@@ -88,6 +112,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
               placeholder="you@company.com"
             />
@@ -106,8 +131,10 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
+              minLength={8}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white font-dm text-sm placeholder-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-colors"
-              placeholder="••••••••"
+              placeholder="Minimum 8 characters"
             />
           </div>
 
@@ -121,7 +148,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-sm text-white/40 font-dm">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/signup" className="text-brand hover:text-brand-dark transition-colors">
             Sign up
           </Link>
