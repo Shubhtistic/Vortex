@@ -9,3 +9,6 @@ Thumbs.db
 # --- Docs build artifacts ---
 docs/_build/
 docs/.docusaurus/
+
+# --- Internal reference only, never commit ---
+api_mapped.md
