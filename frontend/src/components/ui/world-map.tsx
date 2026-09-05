@@ -13,9 +13,7 @@ interface MapProps {
   lineColor?: string
 }
 
-// Zoom factor: 0.55 = 1.8× zoomed out (smaller = more zoomed out)
 const ZOOM = 0.55
-// Arc height scales WITH zoom so arcs stay proportional on the visible area
 const ARC_CURVE = 40 * ZOOM
 
 export default function WorldMap({
@@ -66,29 +64,6 @@ export default function WorldMap({
         viewBox="0 0 800 400"
         className="w-full h-full absolute inset-0 pointer-events-none select-none"
       >
-        {dots.map((dot, i) => {
-          const s = projectPoint(dot.start.lat, dot.start.lng)
-          const e = projectPoint(dot.end.lat, dot.end.lng)
-          return (
-            <g key={`path-group-${i}`}>
-              <motion.path
-                d={createCurvedPath(s, e)}
-                fill="none"
-                stroke="url(#path-gradient)"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                transition={{
-                  duration: 1.0,
-                  delay: 0.5 + i * 0.18,
-                  ease: 'easeInOut',
-                }}
-              />
-            </g>
-          )
-        })}
-
         <defs>
           <linearGradient id="path-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="white" stopOpacity="0" />
@@ -98,77 +73,65 @@ export default function WorldMap({
           </linearGradient>
         </defs>
 
-        {dots.map((dot, i) => (
-          <g key={`points-group-${i}`}>
-            {/* Start */}
-            <g key={`start-${i}`}>
-              <circle
-                cx={projectPoint(dot.start.lat, dot.start.lng).x}
-                cy={projectPoint(dot.start.lat, dot.start.lng).y}
-                r="2.5"
-                fill={lineColor}
-              />
-              <circle
-                cx={projectPoint(dot.start.lat, dot.start.lng).x}
-                cy={projectPoint(dot.start.lat, dot.start.lng).y}
-                r="2.5"
-                fill={lineColor}
-                opacity="0.5"
-              >
-                <animate
-                  attributeName="r"
-                  from="2.5"
-                  to="9"
-                  dur="1.5s"
-                  begin="0s"
-                  repeatCount="indefinite"
-                />
-                <animate
-                  attributeName="opacity"
-                  from="0.5"
-                  to="0"
-                  dur="1.5s"
-                  begin="0s"
-                  repeatCount="indefinite"
-                />
+        {/* Arc paths — animate after map fades in */}
+        {dots.map((dot, i) => {
+          const s = projectPoint(dot.start.lat, dot.start.lng)
+          const e = projectPoint(dot.end.lat, dot.end.lng)
+          const path = createCurvedPath(s, e)
+          return (
+            <motion.path
+              key={`arc-${i}`}
+              d={path}
+              fill="none"
+              stroke={lineColor}
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{
+                duration: 1.0,
+                delay: 1.0 + i * 0.2,
+                ease: 'easeInOut',
+              }}
+            />
+          )
+        })}
+
+        {/* Start points — appear with map fade */}
+        {dots.map((dot, i) => {
+          const s = projectPoint(dot.start.lat, dot.start.lng)
+          return (
+            <g key={`start-${i}`} style={{ animation: `fadeIn 0.4s ease ${0.4 + i * 0.08}s both` }}>
+              <circle cx={s.x} cy={s.y} r="2.5" fill={lineColor} />
+              <circle cx={s.x} cy={s.y} r="2.5" fill={lineColor} opacity="0.5">
+                <animate attributeName="r" from="2.5" to="9" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
+                <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
               </circle>
             </g>
-            {/* End */}
-            <g key={`end-${i}`}>
-              <circle
-                cx={projectPoint(dot.end.lat, dot.end.lng).x}
-                cy={projectPoint(dot.end.lat, dot.end.lng).y}
-                r="2.5"
-                fill={lineColor}
-              />
-              <circle
-                cx={projectPoint(dot.end.lat, dot.end.lng).x}
-                cy={projectPoint(dot.end.lat, dot.end.lng).y}
-                r="2.5"
-                fill={lineColor}
-                opacity="0.5"
-              >
-                <animate
-                  attributeName="r"
-                  from="2.5"
-                  to="9"
-                  dur="1.5s"
-                  begin="0s"
-                  repeatCount="indefinite"
-                />
-                <animate
-                  attributeName="opacity"
-                  from="0.5"
-                  to="0"
-                  dur="1.5s"
-                  begin="0s"
-                  repeatCount="indefinite"
-                />
+          )
+        })}
+
+        {/* End points — appear after arcs complete */}
+        {dots.map((dot, i) => {
+          const e = projectPoint(dot.end.lat, dot.end.lng)
+          return (
+            <g key={`end-${i}`} style={{ animation: `fadeIn 0.4s ease ${1.8 + i * 0.2}s both` }}>
+              <circle cx={e.x} cy={e.y} r="2.5" fill={lineColor} />
+              <circle cx={e.x} cy={e.y} r="2.5" fill={lineColor} opacity="0.5">
+                <animate attributeName="r" from="2.5" to="9" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
+                <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
               </circle>
             </g>
-          </g>
-        ))}
+          )
+        })}
       </svg>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }
