@@ -15,8 +15,6 @@ interface MapProps {
 
 const ZOOM = 0.55
 const ARC_CURVE = 40 * ZOOM
-// Random offset to nudge points onto land (in SVG viewBox units)
-const LAND_JITTER = 12
 
 export default function WorldMap({
   dots = [],
@@ -32,21 +30,12 @@ export default function WorldMap({
     backgroundColor: 'black',
   })
 
-  // Simple seeded random for consistent jitter
-  const seededRandom = (seed: number) => {
-    const x = Math.sin(seed) * 10000
-    return x - Math.floor(x)
-  }
-
-  const projectPoint = (lat: number, lng: number, seed: number = 0) => {
+  const projectPoint = (lat: number, lng: number) => {
     const baseX = (lng + 180) * (800 / 360)
     const baseY = (90 - lat) * (400 / 180)
-    // Add jitter to push point onto land
-    const jitterX = (seededRandom(seed) - 0.5) * LAND_JITTER
-    const jitterY = (seededRandom(seed + 1000) - 0.5) * LAND_JITTER
     return {
-      x: baseX * ZOOM + 400 * (1 - ZOOM) + jitterX,
-      y: baseY * ZOOM + 200 * (1 - ZOOM) + jitterY,
+      x: baseX * ZOOM + 400 * (1 - ZOOM),
+      y: baseY * ZOOM + 200 * (1 - ZOOM),
     }
   }
 
@@ -86,8 +75,8 @@ export default function WorldMap({
 
         {/* Arc paths — animate after map fades in */}
         {dots.map((dot, i) => {
-          const s = projectPoint(dot.start.lat, dot.start.lng, i * 10)
-          const e = projectPoint(dot.end.lat, dot.end.lng, i * 10 + 1)
+          const s = projectPoint(dot.start.lat, dot.start.lng)
+          const e = projectPoint(dot.end.lat, dot.end.lng)
           const path = createCurvedPath(s, e)
           return (
             <motion.path
@@ -95,7 +84,7 @@ export default function WorldMap({
               d={path}
               fill="none"
               stroke={lineColor}
-              strokeWidth="1.6"
+              strokeWidth="1.4"
               strokeLinecap="round"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
@@ -110,12 +99,12 @@ export default function WorldMap({
 
         {/* Start points — appear with map fade */}
         {dots.map((dot, i) => {
-          const s = projectPoint(dot.start.lat, dot.start.lng, i * 10)
+          const s = projectPoint(dot.start.lat, dot.start.lng)
           return (
             <g key={`start-${i}`} style={{ animation: `fadeIn 0.4s ease ${0.4 + i * 0.08}s both` }}>
-              <circle cx={s.x} cy={s.y} r="3" fill={lineColor} />
-              <circle cx={s.x} cy={s.y} r="3" fill={lineColor} opacity="0.5">
-                <animate attributeName="r" from="3" to="10" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
+              <circle cx={s.x} cy={s.y} r="2.5" fill={lineColor} />
+              <circle cx={s.x} cy={s.y} r="2.5" fill={lineColor} opacity="0.5">
+                <animate attributeName="r" from="2.5" to="9" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
                 <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
               </circle>
             </g>
@@ -124,12 +113,12 @@ export default function WorldMap({
 
         {/* End points — appear after arcs complete */}
         {dots.map((dot, i) => {
-          const e = projectPoint(dot.end.lat, dot.end.lng, i * 10 + 1)
+          const e = projectPoint(dot.end.lat, dot.end.lng)
           return (
             <g key={`end-${i}`} style={{ animation: `fadeIn 0.4s ease ${1.8 + i * 0.2}s both` }}>
-              <circle cx={e.x} cy={e.y} r="3" fill={lineColor} />
-              <circle cx={e.x} cy={e.y} r="3" fill={lineColor} opacity="0.5">
-                <animate attributeName="r" from="3" to="10" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
+              <circle cx={e.x} cy={e.y} r="2.5" fill={lineColor} />
+              <circle cx={e.x} cy={e.y} r="2.5" fill={lineColor} opacity="0.5">
+                <animate attributeName="r" from="2.5" to="9" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
                 <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
               </circle>
             </g>
