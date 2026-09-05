@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import DottedMap from 'dotted-map'
+import * as turf from '@turf/turf'
 
 interface MapProps {
   dots?: Array<{
@@ -16,12 +17,93 @@ interface MapProps {
 const ZOOM = 0.55
 const ARC_CURVE = 40 * ZOOM
 
+// Simplified land polygons (major continents in lat/lng)
+const LAND_POLYGONS = [
+  // North America
+  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+    [-170, 70], [-140, 72], [-100, 72], [-60, 65], [-55, 47], [-67, 44], [-80, 30],
+    [-100, 25], [-115, 32], [-125, 42], [-130, 55], [-165, 65], [-170, 70]
+  ]] }},
+  // South America
+  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+    [-80, 10], [-60, 12], [-35, -5], [-35, -20], [-50, -30], [-55, -35], [-70, -55],
+    [-75, -45], [-70, -20], [-80, 0], [-80, 10]
+  ]] }},
+  // Europe
+  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+    [-10, 60], [0, 65], [10, 62], [25, 70], [40, 68], [50, 55], [30, 45],
+    [10, 38], [-5, 36], [-10, 45], [-10, 60]
+  ]] }},
+  // Africa
+  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+    [-15, 35], [10, 35], [30, 32], [50, 12], [50, -2], [40, -15], [35, -35],
+    [20, -35], [15, -5], [0, 5], [-15, 10], [-17, 25], [-15, 35]
+  ]] }},
+  // Asia
+  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+    [30, 70], [60, 72], [100, 70], [140, 60], [150, 50], [140, 35], [120, 20],
+    [100, 10], [80, 10], [70, 25], [50, 35], [30, 45], [30, 70]
+  ]] }},
+  // Australia
+  { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[
+    [115, -15], [145, -12], [155, -25], [150, -38], [135, -38], [115, -30], [115, -15]
+  ]] }},
+]
+
+// Combine all land polygons into one MultiPolygon
+const ALL_LAND = turf.featureCollection(LAND_POLYGONS)
+
+const projectPoint = (lat: number, lng: number) => {
+  const baseX = (lng + 180) * (800 / 360)
+  const baseY = (90 - lat) * (400 / 180)
+  return {
+    x: baseX * ZOOM + 400 * (1 - ZOOM),
+    y: baseY * ZOOM + 200 * (1 - ZOOM),
+  }
+}
+
+// Find nearest point on land using raster-like approach
+const findLandPoint = (lat: number, lng: number, maxIter: number = 20): { lat: number; lng: number } => {
+  let currentLat = lat
+  let currentLng = lng
+  const step = 2 // degrees
+
+  for (let i = 0; i < maxIter; i++) {
+    const point = turf.point([currentLng, currentLat])
+    if (turf.booleanPointInPolygon(point, ALL_LAND)) {
+      return { lat: currentLat, lng: currentLng }
+    }
+    // Move towards nearest land (try all directions)
+    let bestPoint = null
+    let bestDist = Infinity
+    for (const [dLat, dLng] of [[-step, 0], [step, 0], [0, -step], [0, step]]) {
+      const candidate = turf.point([currentLng + dLng, currentLat + dLat])
+      if (turf.booleanPointInPolygon(candidate, ALL_LAND)) {
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng)
+        if (dist < bestDist) {
+          bestDist = dist
+          bestPoint = { lat: currentLat + dLat, lng: currentLng + dLng }
+        }
+      }
+    }
+    if (bestPoint) {
+      currentLat = bestPoint.lat
+      currentLng = bestPoint.lng
+    } else {
+      step *= 0.8
+      if (step < 0.1) break
+    }
+  }
+  return { lat: currentLat, lng: currentLng }
+}
+
 export default function WorldMap({
   dots = [],
   lineColor = '#0ea5e9',
 }: MapProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const map = new DottedMap({ height: 100, grid: 'diagonal' })
+  const [landDots, setLandDots] = useState<typeof dots>([])
 
   const svgMap = map.getSVG({
     radius: 0.22,
@@ -30,14 +112,15 @@ export default function WorldMap({
     backgroundColor: 'black',
   })
 
-  const projectPoint = (lat: number, lng: number) => {
-    const baseX = (lng + 180) * (800 / 360)
-    const baseY = (90 - lat) * (400 / 180)
-    return {
-      x: baseX * ZOOM + 400 * (1 - ZOOM),
-      y: baseY * ZOOM + 200 * (1 - ZOOM),
-    }
-  }
+  // Fix dots to ensure they're on land
+  useEffect(() => {
+    const fixed = dots.map(dot => ({
+      ...dot,
+      start: findLandPoint(dot.start.lat, dot.start.lng),
+      end: findLandPoint(dot.end.lat, dot.end.lng),
+    }))
+    setLandDots(fixed)
+  }, [dots])
 
   const createCurvedPath = (
     start: { x: number; y: number },
@@ -73,8 +156,8 @@ export default function WorldMap({
           </linearGradient>
         </defs>
 
-        {/* Arc paths — animate after map fades in */}
-        {dots.map((dot, i) => {
+        {/* Arc paths */}
+        {landDots.map((dot, i) => {
           const s = projectPoint(dot.start.lat, dot.start.lng)
           const e = projectPoint(dot.end.lat, dot.end.lng)
           const path = createCurvedPath(s, e)
@@ -84,7 +167,7 @@ export default function WorldMap({
               d={path}
               fill="none"
               stroke={lineColor}
-              strokeWidth="1.4"
+              strokeWidth="1.6"
               strokeLinecap="round"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
@@ -97,28 +180,28 @@ export default function WorldMap({
           )
         })}
 
-        {/* Start points — appear with map fade */}
-        {dots.map((dot, i) => {
+        {/* Start points */}
+        {landDots.map((dot, i) => {
           const s = projectPoint(dot.start.lat, dot.start.lng)
           return (
             <g key={`start-${i}`} style={{ animation: `fadeIn 0.4s ease ${0.4 + i * 0.08}s both` }}>
-              <circle cx={s.x} cy={s.y} r="2.5" fill={lineColor} />
-              <circle cx={s.x} cy={s.y} r="2.5" fill={lineColor} opacity="0.5">
-                <animate attributeName="r" from="2.5" to="9" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
+              <circle cx={s.x} cy={s.y} r="3" fill={lineColor} />
+              <circle cx={s.x} cy={s.y} r="3" fill={lineColor} opacity="0.5">
+                <animate attributeName="r" from="3" to="10" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
                 <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${0.4 + i * 0.08}s`} repeatCount="indefinite" />
               </circle>
             </g>
           )
         })}
 
-        {/* End points — appear after arcs complete */}
-        {dots.map((dot, i) => {
+        {/* End points */}
+        {landDots.map((dot, i) => {
           const e = projectPoint(dot.end.lat, dot.end.lng)
           return (
             <g key={`end-${i}`} style={{ animation: `fadeIn 0.4s ease ${1.8 + i * 0.2}s both` }}>
-              <circle cx={e.x} cy={e.y} r="2.5" fill={lineColor} />
-              <circle cx={e.x} cy={e.y} r="2.5" fill={lineColor} opacity="0.5">
-                <animate attributeName="r" from="2.5" to="9" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
+              <circle cx={e.x} cy={e.y} r="3" fill={lineColor} />
+              <circle cx={e.x} cy={e.y} r="3" fill={lineColor} opacity="0.5">
+                <animate attributeName="r" from="3" to="10" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
                 <animate attributeName="opacity" from="0.5" to="0" dur="1.5s" begin={`${1.8 + i * 0.2}s`} repeatCount="indefinite" />
               </circle>
             </g>
