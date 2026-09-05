@@ -1,7 +1,12 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios"
 import { isValidJwtFormat } from "./validation"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL
+if (!BASE_URL) {
+  throw new Error(
+    "NEXT_PUBLIC_API_URL is not set. Add it to .env or Vercel dashboard."
+  )
+}
 
 let currentAccessToken: string | null = null
 
