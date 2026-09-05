@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useRef } from 'react'
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import DottedMap from 'dotted-map'
@@ -13,11 +13,10 @@ interface MapProps {
   lineColor?: string
 }
 
-// How much to zoom out (0.3 = 3x zoomed out, 0.65 = 1.5x zoomed out)
-const ZOOM = 0.42
-
-// Same factor for the arc height offset so arcs scale with the map
-const ARC_CURVE = 50 * (1 / ZOOM)
+// Zoom factor: 0.55 = 1.8× zoomed out (smaller = more zoomed out)
+const ZOOM = 0.55
+// Arc height scales WITH zoom so arcs stay proportional on the visible area
+const ARC_CURVE = 40 * ZOOM
 
 export default function WorldMap({
   dots = [],
@@ -33,7 +32,6 @@ export default function WorldMap({
     backgroundColor: 'black',
   })
 
-  // Project lat/lng to SVG coordinates, then apply zoom toward center
   const projectPoint = (lat: number, lng: number) => {
     const baseX = (lng + 180) * (800 / 360)
     const baseY = (90 - lat) * (400 / 180)
@@ -43,7 +41,6 @@ export default function WorldMap({
     }
   }
 
-  // Quadratic bezier; midY offset scales with ZOOM so arcs stay proportional
   const createCurvedPath = (
     start: { x: number; y: number },
     end: { x: number; y: number }
@@ -70,23 +67,23 @@ export default function WorldMap({
         className="w-full h-full absolute inset-0 pointer-events-none select-none"
       >
         {dots.map((dot, i) => {
-          const startPoint = projectPoint(dot.start.lat, dot.start.lng)
-          const endPoint = projectPoint(dot.end.lat, dot.end.lng)
+          const s = projectPoint(dot.start.lat, dot.start.lng)
+          const e = projectPoint(dot.end.lat, dot.end.lng)
           return (
             <g key={`path-group-${i}`}>
               <motion.path
-                d={createCurvedPath(startPoint, endPoint)}
+                d={createCurvedPath(s, e)}
                 fill="none"
                 stroke="url(#path-gradient)"
-                strokeWidth="1.2"
+                strokeWidth="1.4"
+                strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 1 }}
                 transition={{
-                  duration: 1.2,
-                  delay: 0.3 + i * 0.15,
+                  duration: 1.0,
+                  delay: 0.5 + i * 0.18,
                   ease: 'easeInOut',
                 }}
-                key={`start-upper-${i}`}
               />
             </g>
           )
@@ -95,14 +92,15 @@ export default function WorldMap({
         <defs>
           <linearGradient id="path-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="white" stopOpacity="0" />
-            <stop offset="5%" stopColor={lineColor} stopOpacity="0.9" />
-            <stop offset="95%" stopColor={lineColor} stopOpacity="0.9" />
+            <stop offset="5%" stopColor={lineColor} stopOpacity="1" />
+            <stop offset="95%" stopColor={lineColor} stopOpacity="1" />
             <stop offset="100%" stopColor="white" stopOpacity="0" />
           </linearGradient>
         </defs>
 
         {dots.map((dot, i) => (
           <g key={`points-group-${i}`}>
+            {/* Start */}
             <g key={`start-${i}`}>
               <circle
                 cx={projectPoint(dot.start.lat, dot.start.lng).x}
@@ -135,6 +133,7 @@ export default function WorldMap({
                 />
               </circle>
             </g>
+            {/* End */}
             <g key={`end-${i}`}>
               <circle
                 cx={projectPoint(dot.end.lat, dot.end.lng).x}
