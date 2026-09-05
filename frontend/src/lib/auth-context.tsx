@@ -31,18 +31,16 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const initialToken =
+    typeof sessionStorage !== "undefined" ? sessionStorage.getItem("access_token") : null
   const [user, setUser] = useState<User | null>(null)
-  const [accessToken, setAccessTokenState] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [accessToken, setAccessTokenState] = useState<string | null>(initialToken)
 
   useEffect(() => {
-    const token = sessionStorage.getItem("access_token")
-    if (token) {
-      setAccessToken(token)
-      setAccessTokenState(token)
+    if (initialToken) {
+      setAccessToken(initialToken)
     }
-    setLoading(false)
-  }, [])
+  }, [initialToken])
 
   const login = useCallback(async (org_slug: string, email: string, password: string) => {
     const res = await api.post("/auth/login", { org_slug, email, password })
@@ -76,9 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem("access_token")
   }, [])
 
+  const isAuthenticated = !!accessToken
+
   return (
     <AuthContext.Provider
-      value={{ user, accessToken, login, signup, logout, isAuthenticated: !!accessToken, loading }}
+      value={{ user, accessToken, login, signup, logout, isAuthenticated, loading: false }}
     >
       {children}
     </AuthContext.Provider>
