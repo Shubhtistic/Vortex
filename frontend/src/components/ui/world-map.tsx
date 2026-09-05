@@ -66,7 +66,7 @@ const projectPoint = (lat: number, lng: number) => {
 const findLandPoint = (lat: number, lng: number, maxIter: number = 20): { lat: number; lng: number } => {
   let currentLat = lat
   let currentLng = lng
-  const step = 2 // degrees
+  let step = 2 // degrees
 
   for (let i = 0; i < maxIter; i++) {
     const point = turf.point([currentLng, currentLat])
