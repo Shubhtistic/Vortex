@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useMemo } from 'react'
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import DottedMap from 'dotted-map'
@@ -103,7 +103,6 @@ export default function WorldMap({
 }: MapProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const map = new DottedMap({ height: 100, grid: 'diagonal' })
-  const [landDots, setLandDots] = useState<typeof dots>([])
 
   const svgMap = map.getSVG({
     radius: 0.22,
@@ -112,14 +111,13 @@ export default function WorldMap({
     backgroundColor: 'black',
   })
 
-  // Fix dots to ensure they're on land
-  useEffect(() => {
-    const fixed = dots.map(dot => ({
+  // Fix dots to ensure they're on land (computed synchronously)
+  const landDots = useMemo(() => {
+    return dots.map(dot => ({
       ...dot,
       start: findLandPoint(dot.start.lat, dot.start.lng),
       end: findLandPoint(dot.end.lat, dot.end.lng),
     }))
-    setLandDots(fixed)
   }, [dots])
 
   const createCurvedPath = (
