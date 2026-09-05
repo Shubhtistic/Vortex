@@ -1,8 +1,6 @@
 {
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://lubricate-flatness-foster.ngrok-free.dev/api/$1"
-    }
+    { "source": "/auth/(.*)", "destination": "https://lubricate-flatness-foster.ngrok-free.dev/auth/$1" },
+    { "source": "/organizations/(.*)", "destination": "https://lubricate-flatness-foster.ngrok-free.dev/organizations/$1" }
   ]
 }
