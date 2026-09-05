@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios"
 import { isValidJwtFormat } from "./validation"
 
-const BASE_URL = "https://lubricate-flatness-foster.ngrok-free.dev"
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 let currentAccessToken: string | null = null
 
