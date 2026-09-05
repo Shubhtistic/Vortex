@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from src.vortex.shared.schemas import ApiResponseSchema
 from src.vortex.shared.database import DbSessionDep, get_session_factory
 from src.vortex.shared.responses import ApiResponse
 from src.vortex.users.exceptions import UserAlreadyExistsError
@@ -16,7 +17,7 @@ from .exceptions import (
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 
-@router.post("/signup")
+@router.post("/signup", response_model=ApiResponseSchema)
 async def signup(payload: SignupRequest):
     session_factory = get_session_factory()
     async with session_factory() as db_session:
@@ -45,7 +46,7 @@ async def signup(payload: SignupRequest):
     )
 
 
-@router.post("/invite")
+@router.post("/invite", response_model=ApiResponseSchema)
 async def invite_member(
     payload: InviteMemberRequest,
     current_user: VerifiedAdminDep,

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Cookie, Response
 
+from src.vortex.shared.schemas import ApiResponseSchema
 from src.vortex.shared.database import DbSessionDep
 from src.vortex.shared.responses import ApiResponse
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 REFRESH_COOKIE_PATH = "/auth"
 
 
-@router.post("/login")
+@router.post("/login", response_model=ApiResponseSchema)
 async def login(payload: LoginRequest, db_session: DbSessionDep, response: Response):
 
     try:
@@ -35,6 +36,9 @@ async def login(payload: LoginRequest, db_session: DbSessionDep, response: Respo
             message="Invalid organization, email, or password", code=401
         )
 
+    response = ApiResponse.success(
+        message="Login successful", data={"access_token": access_token}
+    )
     response.set_cookie(
         key="refresh_token",
         value=raw_refresh_token,
@@ -44,12 +48,10 @@ async def login(payload: LoginRequest, db_session: DbSessionDep, response: Respo
         path=REFRESH_COOKIE_PATH,
         max_age=90 * 24 * 60 * 60,
     )
-    return ApiResponse.success(
-        message="Login successful", data={"access_token": access_token}
-    )
+    return response
 
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=ApiResponseSchema)
 async def refresh(
     response: Response,
     db_session: DbSessionDep,
@@ -70,10 +72,11 @@ async def refresh(
         SessionWindowExceededError,
         RefreshTokenExpiredError,
     ):
-        response.delete_cookie(key="refresh_token", path=REFRESH_COOKIE_PATH)
-        return ApiResponse.error(
+        response = ApiResponse.error(
             message="Session expired, please log in again", code=401
         )
+        response.delete_cookie(key="refresh_token", path=REFRESH_COOKIE_PATH)
+        return response
 
     remaining_seconds = int(
         (max_window_limit - datetime.now(timezone.utc)).total_seconds()
@@ -82,6 +85,9 @@ async def refresh(
     # dont pass negative value to cookie expiry
     remaining_seconds = max(remaining_seconds, 0)
 
+    response = ApiResponse.success(
+        message="Token refreshed", data={"access_token": access_token}
+    )
     response.set_cookie(
         key="refresh_token",
         value=new_raw_refresh_token,
@@ -91,12 +97,10 @@ async def refresh(
         path=REFRESH_COOKIE_PATH,
         max_age=remaining_seconds,  #
     )
-    return ApiResponse.success(
-        message="Token refreshed", data={"access_token": access_token}
-    )
+    return response
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=ApiResponseSchema)
 async def logout(
     response: Response,
     db_session: DbSessionDep,
@@ -104,6 +108,7 @@ async def logout(
     refresh_token: str | None = Cookie(default=None, alias="refresh_token"),
 ):
     # --- delete the cookie ---
+    response = ApiResponse.success(message="Logged Out", code=204)
     if refresh_token:
         response.delete_cookie(key="refresh_token", path=REFRESH_COOKIE_PATH)
 
@@ -120,4 +125,4 @@ async def logout(
         ttl_seconds=ttl_seconds,
     )
 
-    return ApiResponse.success(message="Logged Out", code=204)
+    return response
