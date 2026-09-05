@@ -327,8 +327,8 @@ export default function WorldMap({ dots = [], lineColor = "#0ea5e9", dotColor, e
           const e = projectPoint(dot.end.lat, dot.end.lng)
           return (
             <g key={`end-${i}`} style={{ animation: `fadeIn 0.4s ease ${1.8 + i * 0.2}s both` }}>
-              <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#7C6AFA"} />
-              <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#7C6AFA"} opacity="0.5">
+              <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#c0392b"} />
+              <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#c0392b"} opacity="0.5">
                 <animate
                   attributeName="r"
                   from="3"
