@@ -1,5 +1,21 @@
 import type { Metadata } from 'next'
+import { DM_Mono, Syne } from 'next/font/google'
+import Providers from './providers'
 import './globals.css'
+
+const syne = Syne({
+  subsets: ['latin'],
+  weight: ['400', '600', '700', '800'],
+  variable: '--font-syne',
+  display: 'swap',
+})
+
+const dmMono = DM_Mono({
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  variable: '--font-dm-mono',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Vortex',
@@ -12,8 +28,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className={`${syne.variable} ${dmMono.variable}`} suppressHydrationWarning>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

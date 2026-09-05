@@ -1,9 +1,24 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
   --color-brand: #06b6d4;
   --color-brand-dark: #0e7490;
+  --color-bg: #080a0f;
+  --color-surface: rgba(255, 255, 255, 0.032);
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-border-bright: rgba(255, 255, 255, 0.14);
+  --color-accent: #7c6afa;
+  --color-accent2: #3dd9a4;
+  --color-accent3: #f5a623;
+  --color-muted: #4a4d6a;
+  --color-dim: #22253a;
+  --color-red: #f0565b;
+  --color-blue: #4a9eff;
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-syne: var(--font-syne), sans-serif;
+  --font-dm: var(--font-dm-mono), monospace;
 }
 
 @layer base {
@@ -12,9 +27,10 @@
   }
 
   body {
-    @apply bg-slate-950 text-white;
-    font-family: var(--font-sans);
+    @apply bg-white text-neutral-900 dark:bg-bg dark:text-white;
+    font-family: var(--font-dm-mono), monospace;
     margin: 0;
+    min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

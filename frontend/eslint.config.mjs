@@ -15,13 +15,7 @@ const eslintConfig = [
   },
   ...nextVitals,
   ...nextTypescript,
-  {
-    files: ['src/components/PixelBlast.tsx'],
-    rules: {
-      '@typescript-eslint/ban-ts-comment': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
-    },
-  },
+
 ]
 
 export default eslintConfig
