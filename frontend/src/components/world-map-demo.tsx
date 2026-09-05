@@ -15,11 +15,19 @@ export default function WorldMapDemo() {
           <WorldMap
             dots={[
               {
-                start: { lat: 78.5074, lng: 190.1278, label: "Arctic Ocean, north of the Chukchi Sea" },
+                start: {
+                  lat: 78.5074,
+                  lng: 190.1278,
+                  label: "Arctic Ocean, north of the Chukchi Sea",
+                },
                 end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: -80.2008, lng: 250.4937, label: "Antarctica, Marie Byrd Land region" },
+                start: {
+                  lat: -80.2008,
+                  lng: 250.4937,
+                  label: "Antarctica, Marie Byrd Land region",
+                },
                 end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
@@ -31,7 +39,11 @@ export default function WorldMapDemo() {
                 end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: 120.2008, lng: -89.4937, label: "No real-world location: latitude exceeds 90° N" },
+                start: {
+                  lat: 120.2008,
+                  lng: -89.4937,
+                  label: "No real-world location: latitude exceeds 90° N",
+                },
                 end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
@@ -39,7 +51,11 @@ export default function WorldMapDemo() {
                 end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
               {
-                start: { lat: 400.2008, lng: 270.4937, label: "No real-world location: latitude exceeds 90° N" },
+                start: {
+                  lat: 400.2008,
+                  lng: 270.4937,
+                  label: "No real-world location: latitude exceeds 90° N",
+                },
                 end: { lat: 4.7975, lng: 3.8919, label: "Gulf of Guinea" },
               },
             ]}

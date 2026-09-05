@@ -219,7 +219,12 @@ const findLandPoint = (
   return { lat: currentLat, lng: currentLng }
 }
 
-export default function WorldMap({ dots = [], lineColor = "#0ea5e9", dotColor, endDotColor }: MapProps) {
+export default function WorldMap({
+  dots = [],
+  lineColor = "#9B1313",
+  dotColor,
+  endDotColor,
+}: MapProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const map = new DottedMap({ height: 100, grid: "diagonal" })
 
@@ -327,8 +332,8 @@ export default function WorldMap({ dots = [], lineColor = "#0ea5e9", dotColor, e
           const e = projectPoint(dot.end.lat, dot.end.lng)
           return (
             <g key={`end-${i}`} style={{ animation: `fadeIn 0.4s ease ${1.8 + i * 0.2}s both` }}>
-              <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#c0392b"} />
-              <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#c0392b"} opacity="0.5">
+              <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#E35336"} />
+              <circle cx={e.x} cy={e.y} r="5" fill={endDotColor || "#FDFBD4"} opacity="0.13">
                 <animate
                   attributeName="r"
                   from="3"
