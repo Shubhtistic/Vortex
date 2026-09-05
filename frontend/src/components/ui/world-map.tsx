@@ -51,7 +51,9 @@ const LAND_POLYGONS = [
 ]
 
 // Combine all land polygons into one MultiPolygon
-const ALL_LAND = turf.featureCollection(LAND_POLYGONS as any)
+const ALL_LAND = turf.multiPolygon(
+  LAND_POLYGONS.map((p: any) => p.geometry.coordinates)
+)
 
 const projectPoint = (lat: number, lng: number) => {
   const baseX = (lng + 180) * (800 / 360)
