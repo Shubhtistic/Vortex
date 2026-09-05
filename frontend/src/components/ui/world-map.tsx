@@ -51,7 +51,7 @@ const LAND_POLYGONS = [
 ]
 
 // Combine all land polygons into one MultiPolygon
-const ALL_LAND = turf.featureCollection(LAND_POLYGONS)
+const ALL_LAND = turf.featureCollection(LAND_POLYGONS as any)
 
 const projectPoint = (lat: number, lng: number) => {
   const baseX = (lng + 180) * (800 / 360)
@@ -70,7 +70,7 @@ const findLandPoint = (lat: number, lng: number, maxIter: number = 20): { lat: n
 
   for (let i = 0; i < maxIter; i++) {
     const point = turf.point([currentLng, currentLat])
-    if (turf.booleanPointInPolygon(point, ALL_LAND)) {
+    if (turf.booleanPointInPolygon(point as any, ALL_LAND as any)) {
       return { lat: currentLat, lng: currentLng }
     }
     // Move towards nearest land (try all directions)
@@ -78,7 +78,7 @@ const findLandPoint = (lat: number, lng: number, maxIter: number = 20): { lat: n
     let bestDist = Infinity
     for (const [dLat, dLng] of [[-step, 0], [step, 0], [0, -step], [0, step]]) {
       const candidate = turf.point([currentLng + dLng, currentLat + dLat])
-      if (turf.booleanPointInPolygon(candidate, ALL_LAND)) {
+      if (turf.booleanPointInPolygon(candidate as any, ALL_LAND as any)) {
         const dist = Math.sqrt(dLat * dLat + dLng * dLng)
         if (dist < bestDist) {
           bestDist = dist
