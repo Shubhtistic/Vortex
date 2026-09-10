@@ -1,8 +1,11 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useGSAP } from "@gsap/react"
 import gsap from "gsap"
+import { useRef } from "react"
 import WorldMap from "@/components/ui/world-map"
+
+gsap.registerPlugin(useGSAP)
 
 const dots = [
   {
@@ -34,31 +37,21 @@ const dots = [
 export default function Hero() {
   const containerRef = useRef<HTMLElement>(null)
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
+  useGSAP(
+    () => {
       const tl = gsap.timeline({ defaults: { ease: "power4.out" } })
 
-      tl.fromTo(
-        ".hero-title",
-        { y: 50, opacity: 0 },
-        { y: 0, opacity: 1, duration: 1.2 }
-      )
-        .fromTo(
-          ".hero-subtitle",
-          { y: 30, opacity: 0 },
-          { y: 0, opacity: 1, duration: 1 },
-          "-=0.8"
-        )
+      tl.fromTo(".hero-title", { y: 50, opacity: 0 }, { y: 0, opacity: 1, duration: 1.2 })
+        .fromTo(".hero-subtitle", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 1 }, "-=0.8")
         .fromTo(
           ".hero-map",
           { opacity: 0, scale: 1.05 },
           { opacity: 1, scale: 1, duration: 1.4, ease: "power3.out" },
           "-=0.6"
         )
-    }, containerRef)
-
-    return () => ctx.revert()
-  }, [])
+    },
+    { scope: containerRef }
+  )
 
   return (
     <section
@@ -67,10 +60,12 @@ export default function Hero() {
       className="bg-black overflow-hidden"
     >
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
-        <h1 className="hero-title text-6xl font-bold font-syne text-white">Vortex</h1>
-        <p className="hero-subtitle text-xl mt-4 font-dm text-white/60">Next-gen event tracking</p>
+        <h1 className="hero-title opacity-0 text-6xl font-bold font-syne text-white">Vortex</h1>
+        <p className="hero-subtitle opacity-0 text-xl mt-4 font-dm text-white/60">
+          Next-gen event tracking
+        </p>
       </div>
-      <div className="hero-map absolute inset-0 -z-10 flex items-center justify-center px-4">
+      <div className="hero-map opacity-0 absolute inset-0 -z-10 flex items-center justify-center px-4">
         <WorldMap dots={dots} lineColor="#06B6D4" dotColor="#06B6D4" endDotColor="#3DD9A4" />
       </div>
     </section>

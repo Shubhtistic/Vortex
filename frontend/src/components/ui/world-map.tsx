@@ -291,8 +291,8 @@ export default function WorldMap({
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
               transition={{
-                duration: 0.8,
-                delay: 0.3 + i * 0.1,
+                duration: 1.0,
+                delay: 0.4 + i * 0.1,
                 ease: "easeInOut",
               }}
             />
@@ -303,7 +303,13 @@ export default function WorldMap({
         {landDots.map((dot, i) => {
           const s = projectPoint(dot.start.lat, dot.start.lng)
           return (
-            <g key={`start-${i}`} style={{ animation: `fadeIn 0.4s ease ${0.4 + i * 0.08}s both` }}>
+            <g
+              key={`start-${i}`}
+              style={{
+                opacity: 0,
+                animation: `fadeIn 0.4s ease ${0.1 + i * 0.05}s forwards`,
+              }}
+            >
               <circle cx={s.x} cy={s.y} r="3" fill={dotColor || lineColor} />
               <circle cx={s.x} cy={s.y} r="3" fill={dotColor || lineColor} opacity="0.5">
                 <animate
@@ -311,7 +317,7 @@ export default function WorldMap({
                   from="3"
                   to="10"
                   dur="1.5s"
-                  begin={`${0.4 + i * 0.08}s`}
+                  begin={`${0.1 + i * 0.05}s`}
                   repeatCount="indefinite"
                 />
                 <animate
@@ -319,7 +325,7 @@ export default function WorldMap({
                   from="0.5"
                   to="0"
                   dur="1.5s"
-                  begin={`${0.4 + i * 0.08}s`}
+                  begin={`${0.1 + i * 0.05}s`}
                   repeatCount="indefinite"
                 />
               </circle>
@@ -331,7 +337,13 @@ export default function WorldMap({
         {landDots.map((dot, i) => {
           const e = projectPoint(dot.end.lat, dot.end.lng)
           return (
-            <g key={`end-${i}`} style={{ animation: `fadeIn 0.4s ease ${1.8 + i * 0.2}s both` }}>
+            <g
+              key={`end-${i}`}
+              style={{
+                opacity: 0,
+                animation: `fadeIn 0.4s ease ${2.4 + i * 0.05}s forwards`,
+              }}
+            >
               <circle cx={e.x} cy={e.y} r="3" fill={endDotColor || "#E35336"} />
               <circle cx={e.x} cy={e.y} r="5" fill={endDotColor || "#FDFBD4"} opacity="0.13">
                 <animate
@@ -339,7 +351,7 @@ export default function WorldMap({
                   from="3"
                   to="10"
                   dur="1.5s"
-                  begin={`${1.8 + i * 0.2}s`}
+                  begin={`${2.4 + i * 0.05}s`}
                   repeatCount="indefinite"
                 />
                 <animate
@@ -347,7 +359,7 @@ export default function WorldMap({
                   from="0.5"
                   to="0"
                   dur="1.5s"
-                  begin={`${1.8 + i * 0.2}s`}
+                  begin={`${2.4 + i * 0.05}s`}
                   repeatCount="indefinite"
                 />
               </circle>
@@ -356,7 +368,7 @@ export default function WorldMap({
         })}
       </svg>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
