@@ -32,7 +32,7 @@ const dots = [
 ]
 
 export default function Hero() {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -55,14 +55,14 @@ export default function Hero() {
           { opacity: 1, scale: 1, duration: 1.4, ease: "power3.out" },
           "-=0.6"
         )
-    }, container)
+    }, containerRef)
 
     return () => ctx.revert()
   }, [])
 
   return (
     <section
-      ref={(el) => { containerRef.current = el }}
+      ref={containerRef}
       style={{ width: "100%", height: "100vh", position: "relative" }}
       className="bg-black overflow-hidden"
     >
@@ -76,5 +76,3 @@ export default function Hero() {
     </section>
   )
 }
-
-const containerRef = useRef<HTMLDivElement>(null)
