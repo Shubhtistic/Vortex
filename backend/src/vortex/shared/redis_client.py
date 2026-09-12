@@ -1,8 +1,11 @@
 from typing import Annotated
+import logging
 from fastapi import Depends
 from redis.asyncio import Redis, ConnectionPool
 
 from .config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -16,6 +19,7 @@ async def init_redis() -> None:
     global _pool, _redis
 
     if _redis is not None:
+        logger.debug("Redis client already initialized")
         return
 
     _pool = ConnectionPool.from_url(
@@ -29,11 +33,13 @@ async def init_redis() -> None:
         health_check_interval=30,
     )
     _redis = Redis(connection_pool=_pool)
+    logger.info("Redis client initialized")
 
 
 def get_redis() -> Redis:
     """get redis client"""
     if _redis is None:
+        logger.error("Redis client requested before initialization")
         raise RuntimeError(
             "Redis client not initialized — call init_redis() on startup first"
         )
@@ -60,3 +66,5 @@ async def close_redis() -> None:
     if _pool is not None:
         await _pool.disconnect()
         _pool = None
+
+    logger.info("Redis client closed")

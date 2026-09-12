@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import hashlib, secrets
+import logging
 from typing import Any, Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,8 @@ from .exceptions import (
     SessionWindowExceededError,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class AuthService:
     @staticmethod
@@ -36,15 +39,18 @@ class AuthService:
                 db_session=db_session, slug=org_slug
             )
         except OrganizationNotFoundError:
+            logger.warning("Login failed: organization not found")
             raise InvalidCredentialsError(email=email)  # generic on purpose
 
         # step 2 -> User table: email -> user row (+ password check)
         try:
             user = await UserService.get_by_email(db_session=db_session, email=email)
         except UserNotFoundError:
+            logger.warning("Login failed: user not found")
             raise InvalidCredentialsError(email=email)
 
         if not verify_password(plain_password, user.hashed_password):
+            logger.warning("Login failed: invalid password")
             raise InvalidCredentialsError(email=email)
 
         # step 3 -> OrganizationMembership table: (org_id, user_id) -> role
@@ -53,6 +59,7 @@ class AuthService:
                 db_session=db_session, org_id=org.id, user_id=user.id
             )
         except NotAMemberError:
+            logger.warning("Login failed: inactive organization membership")
             raise InvalidCredentialsError(email=email)
 
         # step 4 -> return access_token and refresh_tokens
@@ -62,6 +69,7 @@ class AuthService:
         refresh_token = await RefreshTokenService.create(
             db_session=db_session, user_id=user.id, org_id=org.id, role=membership.role
         )
+        logger.info("Login service operation succeeded")
 
         return access_token, refresh_token
 
@@ -83,7 +91,7 @@ class AuthService:
             org_id=membership.organization_id,
             role=membership.role,
         )
-
+        logger.info("Refresh service operation succeeded")
         return access_token, raw_refresh_token, max_window_limit
 
     @staticmethod
@@ -106,6 +114,7 @@ class AuthService:
         if jti and ttl_seconds:
             await JwtRepository.add_jti_to_blacklist(jti=jti, ttl_seconds=ttl_seconds)
 
+        logger.info("Logout service operation completed")
         return None
 
 
@@ -154,7 +163,7 @@ class RefreshTokenService:
         await RefreshTokenRepository.create(
             db_session=db_session, instance=new_refresh_token
         )
-
+        logger.debug("Refresh token created")
         return raw_token
 
     @staticmethod
@@ -172,15 +181,19 @@ class RefreshTokenService:
             db_session, hashed_token
         )
         if existing_token is None:
+            logger.warning("Refresh token rotation rejected: token not found")
             raise RefreshTokenNotFoundError
 
         if existing_token.is_revoked:
+            logger.warning("Refresh token rotation rejected: token revoked")
             raise RefreshTokenRevokedError
 
         if now >= existing_token.max_window_limit:
+            logger.warning("Refresh token rotation rejected: session window exceeded")
             raise SessionWindowExceededError
 
         if now >= existing_token.expires_at:
+            logger.warning("Refresh token rotation rejected: token expired")
             raise RefreshTokenExpiredError
 
         membership = await MembershipService.get_membership(
@@ -189,6 +202,7 @@ class RefreshTokenService:
             user_id=existing_token.user_id,
         )
         if (not membership) or (not membership.is_active):
+            logger.warning("Refresh token rotation rejected: inactive membership")
             raise RefreshTokenExpiredError
 
         new_expires_at = RefreshTokenService.calculate_next_expiry(
@@ -205,5 +219,5 @@ class RefreshTokenService:
             expires_at=new_expires_at,
             role=membership.role.value,
         )
-
+        logger.info("Refresh token rotated")
         return new_raw_token, membership, existing_token.max_window_limit

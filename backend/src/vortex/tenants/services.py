@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,8 @@ from .schemas import (
 from .models import ApiKey, Tenant
 from .repository import ApiKeyRepository, TenantRepository
 
+logger = logging.getLogger(__name__)
+
 # ====== Tenant Service ======
 
 
@@ -32,6 +35,7 @@ class TenantService:
         if await TenantRepository.check_by_slug(
             slug=payload.slug, org_id=org_id, db_session=db_session
         ):
+            logger.warning("Tenant creation rejected: slug already exists")
             raise SlugAlreadyExistsErorr
 
         payload_dict = payload.model_dump()
@@ -45,7 +49,7 @@ class TenantService:
         await TenantRepository.create_tenant(
             tenant_instance=tenant_instance, db_session=db_session
         )
-
+        logger.info("Tenant created")
         # return dict data
         return TenantRead.model_validate(tenant_instance).model_dump()
 
@@ -62,6 +66,7 @@ class TenantService:
         )
 
         if not total_count:
+            logger.debug("No tenants found")
             return [], 0
 
         return [
@@ -86,6 +91,7 @@ class ApiKeyService:
             tenant_id=payload.tenant_id,
             db_session=db_session,
         ):
+            logger.warning("API key creation rejected: slug already exists")
             raise SlugAlreadyExistsErorr
 
         # new slug -> create new api key
@@ -106,7 +112,7 @@ class ApiKeyService:
         api_key = await ApiKeyRepository.create_api_key(
             api_key_instance=api_key_instance, db_session=db_session
         )
-
+        logger.info("API key created")
         # return dict data
         dict_data = ApiKeyRead.model_validate(api_key).model_dump()
 
@@ -130,6 +136,7 @@ class ApiKeyService:
         )
 
         if total_count == 0:
+            logger.debug("No API keys found")
             return [], 0
 
         return [
@@ -172,8 +179,7 @@ class ApiKeyService:
                 await remove_api_key_from_cache(hashed_api_key)
             except Exception:
                 # redis down then ->  DB is source of truth
-                print("Cache exception could not remove key")
-                # todo -> logging
+                logger.exception("Could not remove revoked API key from cache")
 
         # done
 
@@ -193,6 +199,7 @@ class ApiKeyService:
             tenant_id=payload.tenant_id,
             db_session=db_session,
         ):
+            logger.warning("API key rotation rejected: key is already inactive")
             raise ApiKeyAlreadyNonActiveError
 
         # imp check if slug exists before marking as graced
@@ -203,6 +210,7 @@ class ApiKeyService:
             tenant_id=payload.tenant_id,
             db_session=db_session,
         ):
+            logger.warning("API key rotation rejected: slug already exists")
             raise SlugAlreadyExistsErorr
 
         # step 2 -> exact revoke logic + create new api key logic
@@ -226,8 +234,7 @@ class ApiKeyService:
                 await remove_api_key_from_cache(hashed_api_key)
             except Exception:
                 # redis down, ignore - DB is source of truth
-                print("Cache exception could not remove key")
-                # todo -> logging
+                logger.exception("Could not remove rotated API key from cache")
 
         # now that api is in grace period
         # create a new one and return new one to user
@@ -249,7 +256,7 @@ class ApiKeyService:
         api_key = await ApiKeyRepository.create_api_key(
             api_key_instance=api_key_instance, db_session=db_session
         )
-
+        logger.info("API key rotated")
         # return dict data
         dict_data = ApiKeyRead.model_validate(api_key).model_dump()
 

@@ -102,7 +102,6 @@ async def get_all_members(
         limit=limit,
         page_num=page_num,
     )
-
     total_pages = (total_count + limit - 1) // limit if total_count else 0
 
     return ApiResponse.success(

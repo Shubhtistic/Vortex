@@ -1,4 +1,5 @@
 import asyncio, hmac, orjson
+import logging
 import random
 from typing import Optional
 from datetime import datetime, timezone
@@ -15,6 +16,8 @@ from .models import ApiKeyStatus
 from .repository import ApiKeyRepository
 from .utils import hash_api_key
 
+logger = logging.getLogger(__name__)
+
 # ========= TTL & LOCK VALUES ===========
 LOCK_TIMEOUT = 5
 LOCK_BLOCKING_TIMEOUT = 2
@@ -27,6 +30,7 @@ async def verify_api_key(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> dict:
     if x_api_key is None:
+        logger.warning("API key authentication failed: key missing")
         raise HTTPException(
             status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Missing API key"
         )
@@ -41,8 +45,7 @@ async def verify_api_key(
             cache_key=cache_key,
         )
     except RedisError as e:
-        print(f"CRITICAL, Redis threw an Exception -> {e}")
-        # todo -> add loging
+        logger.exception("Redis unavailable during API key verification")
         # try using only db if redis is down
 
         return await verify_with_db_only(hashed_key=hashed_key)
@@ -84,6 +87,7 @@ async def _verify_using_cache_and_db(
             if api_key_row is None or not hmac.compare_digest(
                 api_key_row.hashed_key, hashed_key
             ):
+                logger.warning("API key authentication failed: key invalid")
                 raise HTTPException(
                     status_code=http_status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid API key",
@@ -91,6 +95,7 @@ async def _verify_using_cache_and_db(
 
             # process now
             if api_key_row.status == ApiKeyStatus.revoked:
+                logger.warning("API key authentication failed: key revoked")
 
                 # value
                 value = {
@@ -134,6 +139,7 @@ async def _verify_using_cache_and_db(
 
                 # grace period still remains
                 else:
+                    logger.info("API key accepted during grace period")
                     payload = {
                         "status": ApiKeyStatus.grace_period.value,
                         "tenant_id": str(api_key_row.tenant_id),
@@ -155,6 +161,7 @@ async def _verify_using_cache_and_db(
             ex = ACTIVE_KEY_TTL + random.randint(-30, 30)
 
             await redis.set(cache_key, orjson.dumps(payload), ex=ex)
+            logger.debug("API key accepted from database and cached")
             return payload
 
 

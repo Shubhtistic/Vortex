@@ -1,4 +1,5 @@
 from uuid import UUID
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .schemas import (
@@ -21,6 +22,8 @@ from .exceptions import (
     UserAlreadyMemberError,
     UserCannotBeDeletedError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OrganizationService:
@@ -61,7 +64,7 @@ class OrganizationService:
                 organization_id=org.id, user_id=user.id, role=MembershipRole.owner
             ),
         )
-
+        logger.info("Organization signup completed")
         # return Membership Orm Object
         return MembershipRead.model_validate(membership).model_dump()
 
@@ -104,13 +107,14 @@ class OrganizationService:
             role=payload.role,
             invited_by_user_id=invited_by_user_id,
         )
-
+        logger.info("Organization member invitation completed")
         return MembershipRead.model_validate(new_membership).model_dump()
 
     @staticmethod
     async def get_by_slug(db_session: AsyncSession, slug: str) -> Organization:
         org = await OrganizationRepository.get_by_slug(db_session=db_session, slug=slug)
         if org is None:
+            logger.warning("Organization lookup failed: organization not found")
             raise OrganizationNotFoundError(identifier=slug)
         return org
 
@@ -120,8 +124,10 @@ class OrganizationService:
             org_id=org_id, db_session=db_session
         )
         if not org:
+            logger.warning("Organization lookup failed: organization not found")
             raise OrganizationNotFoundError(identifier=str(org_id))
 
+        logger.info("Organization details fetched")
         return OrganizationResponse.model_validate(org).model_dump()
 
 
@@ -145,6 +151,7 @@ class MembershipService:
         new_membership = await MembershipRepository.create_membership(
             db_session=db_session, instance=new_membership_instance
         )
+        logger.info("Organization membership created")
         return new_membership
 
     @staticmethod
@@ -155,6 +162,7 @@ class MembershipService:
             db_session=db_session, org_id=org_id, user_id=user_id
         )
         if membership is None:
+            logger.warning("Membership lookup failed: active membership not found")
             raise NotAMemberError(org_id=org_id, user_id=user_id)
         return membership
 
@@ -168,6 +176,7 @@ class MembershipService:
             org_id, db_session, offset, limit
         )
         if not total_count:
+            logger.debug("No active organization members found")
             return [], 0
 
         users_by_id = await UserService.get_users_by_ids(
@@ -194,6 +203,8 @@ class MembershipService:
         if deleted_id := await MembershipRepository.deactivate_member(
             db_session=db_session, org_id=org_id, user_id=target_user_id
         ):
+            logger.info("Organization membership deactivated")
             return deleted_id
 
+        logger.warning("Organization membership deactivation failed")
         raise UserCannotBeDeletedError

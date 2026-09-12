@@ -123,5 +123,4 @@ async def logout(
         jti=jti,
         ttl_seconds=ttl_seconds,
     )
-
     return Response(status_code=204, headers=response.headers)

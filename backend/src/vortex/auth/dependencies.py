@@ -1,4 +1,5 @@
 from typing import Annotated
+import logging
 from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -11,6 +12,7 @@ from .jwt import decode_and_verify_token
 from .exceptions import ExpiredSignatureError, InvalidTokenError, UnexpectedJwtError
 
 bearer_scheme = HTTPBearer()
+logger = logging.getLogger(__name__)
 
 
 async def current_user_dep(
@@ -20,6 +22,7 @@ async def current_user_dep(
     try:
         claims = decode_and_verify_token(credentials.credentials)
     except (ExpiredSignatureError, InvalidTokenError, UnexpectedJwtError):
+        logger.warning("Bearer token rejected")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -34,6 +37,7 @@ async def optional_current_user_dep(
     try:
         claims = decode_and_verify_token(credentials.credentials)
     except (ExpiredSignatureError, InvalidTokenError, UnexpectedJwtError):
+        logger.debug("Optional bearer token rejected")
         return {}
     return claims
 
@@ -44,6 +48,7 @@ async def _get_verified_membership(current_user: dict, db_session: DbSessionDep)
         user_id = UUID(current_user["user_id"])
         org_id = UUID(current_user["org_id"])
     except (KeyError, ValueError):
+        logger.warning("Bearer token claims malformed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Malformed token claims",
@@ -54,12 +59,14 @@ async def _get_verified_membership(current_user: dict, db_session: DbSessionDep)
             db_session=db_session, org_id=org_id, user_id=user_id
         )
     except OperationalError:
+        logger.exception("Membership verification database unavailable")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service temporarily unavailable, please try again shortly",
         )
 
     if membership is None or not membership.is_active:
+        logger.warning("Membership verification failed: inactive membership")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not an active member of this organization",
@@ -76,6 +83,7 @@ async def verified_admin_dep(
     membership = await _get_verified_membership(current_user, db_session)
 
     if membership.role not in (MembershipRole.admin, MembershipRole.owner):
+        logger.warning("Admin authorization failed")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin or owner role required",
@@ -92,6 +100,7 @@ async def verified_owner_dep(
     membership = await _get_verified_membership(current_user, db_session)
 
     if membership.role != MembershipRole.owner:
+        logger.warning("Owner authorization failed")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Owner role required",

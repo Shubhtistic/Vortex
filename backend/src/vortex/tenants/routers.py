@@ -54,7 +54,6 @@ async def get_all_tenants(
         limit=limit,
         page_num=page_num,
     )
-
     # total pages
     total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
 
@@ -110,7 +109,6 @@ async def get_all_api_keys(
         limit=limit,
         page_num=page_num,
     )
-
     total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
 
     return ApiResponse.success(
