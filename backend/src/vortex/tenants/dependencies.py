@@ -1,9 +1,9 @@
 import asyncio, hmac, orjson
 import logging
 import random
-from typing import Optional
+from typing import Annotated, Optional
 from datetime import datetime, timezone
-from fastapi import Header, HTTPException, status as http_status
+from fastapi import Depends, Header, HTTPException, status as http_status
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from sqlalchemy.exc import OperationalError
@@ -260,3 +260,8 @@ def _process_cache(
         "organization_id": cached["organization_id"],
         "status": cached["status"],
     }
+
+
+# === Api Key Auth Dependency ====
+
+VerifyApiKeyDep = Annotated[dict, Depends(verify_api_key)]
