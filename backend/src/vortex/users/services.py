@@ -45,6 +45,12 @@ class UserService:
         return user
 
     @staticmethod
+    async def find_by_email(db_session: AsyncSession, email: str) -> Optional[User]:
+        return await UserRepository.find_by_email(
+            db_session=db_session, email=email
+        )
+
+    @staticmethod
     async def get_users_by_ids(
         db_session: AsyncSession, user_ids: list[UUID]
     ) -> dict[UUID, UserResponse]:

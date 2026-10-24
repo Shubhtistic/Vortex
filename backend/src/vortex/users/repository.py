@@ -31,6 +31,11 @@ class UserRepository:
         return await get_one_by_query(qry, db_session)
 
     @staticmethod
+    async def find_by_email(db_session: AsyncSession, email: str) -> Optional[User]:
+        qry = select(User).where(User.email == email)
+        return await get_one_by_query(qry, db_session)
+
+    @staticmethod
     async def get_by_ids(db_session: AsyncSession, user_ids: list[UUID]) -> list[User]:
         if not user_ids:
             return []

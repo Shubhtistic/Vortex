@@ -76,11 +76,11 @@ class OrganizationService:
         invited_by_user_id: UUID,
     ) -> dict:
 
-        row = await MembershipRepository.get_invite_precheck_row(
-            db_session=db_session, email=payload.email, org_id=org_id
+        target_user = await UserService.find_by_email(
+            db_session=db_session, email=payload.email
         )
 
-        if row is None:
+        if target_user is None:
             target_user = await UserService.create_user(
                 db_session=db_session,
                 user_data={
@@ -90,20 +90,23 @@ class OrganizationService:
                     "last_name": payload.last_name,
                 },
             )
-            target_user_id = target_user.id
-
         else:
-            if row.is_superuser_anywhere is not None:
+            if await MembershipRepository.has_active_owner_membership(
+                db_session=db_session, user_id=target_user.id
+            ):
                 raise CannotInviteRootAccountError(email=payload.email)
-            if row.already_member is not None:
-                raise UserAlreadyMemberError(org_id=org_id, email=payload.email)
 
-            target_user_id = row.user_id
+            if await MembershipRepository.get_active_membership(
+                db_session=db_session,
+                org_id=org_id,
+                user_id=target_user.id,
+            ):
+                raise UserAlreadyMemberError(org_id=org_id, email=payload.email)
 
         new_membership = await MembershipService.create_membership(
             db_session=db_session,
             organization_id=org_id,
-            user_id=target_user_id,
+            user_id=target_user.id,
             role=payload.role,
             invited_by_user_id=invited_by_user_id,
         )
