@@ -10,7 +10,6 @@ from src.vortex.shared.database import (
     check_exists,
     create,
     execute_query,
-    get_all,
     get_one_by_query,
 )
 
@@ -81,23 +80,15 @@ class MembershipRepository:
         )
 
     @staticmethod
-    async def get_all_active_members(org_id: UUID, db_session, offset: int, limit: int):
-        """get all active members"""
-        count_q = (
-            select(func.count())
-            .select_from(OrganizationMembership)
-            .where(
-                OrganizationMembership.organization_id == org_id,
-                OrganizationMembership.is_active == True,
+    async def get_all_active_members(
+        org_id: UUID, db_session: AsyncSession, offset: int, limit: int
+    ) -> tuple[list[OrganizationMembership], int]:
+        """Fetch one active-member page and its total with one query when possible."""
+        stmt = (
+            select(
+                OrganizationMembership,
+                func.count().over().label("total_count"),
             )
-        )
-
-        total_count = (
-            await execute_query(query=count_q, db_session=db_session)
-        ).scalar_one()
-
-        q = (
-            select(OrganizationMembership)
             .where(
                 OrganizationMembership.organization_id == org_id,
                 OrganizationMembership.is_active == True,
@@ -106,9 +97,25 @@ class MembershipRepository:
             .limit(limit)
             .offset(offset)
         )
-
-        data = await get_all(stmt=q, db_session=db_session)
-
+        result = await execute_query(query=stmt, db_session=db_session)
+        rows = result.all()
+        data = [row[0] for row in rows]
+        if rows:
+            total_count = rows[0].total_count
+        else:
+            # A window count has no row to carry the total when the page is empty.
+            count_stmt = (
+                select(func.count())
+                .select_from(OrganizationMembership)
+                .where(
+                    OrganizationMembership.organization_id == org_id,
+                    OrganizationMembership.is_active == True,
+                )
+            )
+            count_result = await execute_query(
+                query=count_stmt, db_session=db_session
+            )
+            total_count = count_result.scalar_one()
         return data, total_count
 
     @staticmethod

@@ -26,9 +26,9 @@ class InviteMemberRequest(BaseModel):
     email: EmailStr
     role: InviteMembershipRole  # only "admin" or "analyst" accepted
 
-    _validate_text = field_validator(
-        "first_name", "last_name", "password", "email"
-    )(reject_blank_text)
+    _validate_text = field_validator("first_name", "last_name", "password", "email")(
+        reject_blank_text
+    )
 
 
 class MembershipRead(BaseModel):
