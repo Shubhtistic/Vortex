@@ -100,6 +100,7 @@ async def _verify_using_cache_and_db(
                 # value
                 value = {
                     "status": ApiKeyStatus.revoked.value,
+                    "api_key_id": str(api_key_row.id),
                     "tenant_id": str(api_key_row.tenant_id),
                     "organization_id": str(api_key_row.organization_id),
                 }
@@ -124,6 +125,7 @@ async def _verify_using_cache_and_db(
                     )
                     payload = {
                         "status": ApiKeyStatus.revoked.value,  # FIX: was enum object
+                        "api_key_id": str(api_key_row.id),
                         "tenant_id": str(api_key_row.tenant_id),
                         "organization_id": str(api_key_row.organization_id),
                     }
@@ -142,6 +144,7 @@ async def _verify_using_cache_and_db(
                     logger.info("API key accepted during grace period")
                     payload = {
                         "status": ApiKeyStatus.grace_period.value,
+                        "api_key_id": str(api_key_row.id),
                         "tenant_id": str(api_key_row.tenant_id),
                         "organization_id": str(api_key_row.organization_id),
                     }
@@ -152,6 +155,7 @@ async def _verify_using_cache_and_db(
             # key is activ
             payload = {
                 "status": ApiKeyStatus.active.value,
+                "api_key_id": str(api_key_row.id),
                 "tenant_id": str(api_key_row.tenant_id),
                 "organization_id": str(api_key_row.organization_id),
             }
@@ -208,6 +212,7 @@ async def verify_with_db_only(hashed_key: str):
                 else:
                     payload = {
                         "status": ApiKeyStatus.grace_period.value,
+                        "api_key_id": str(api_key_row.id),
                         "tenant_id": str(api_key_row.tenant_id),
                         "organization_id": str(api_key_row.organization_id),
                     }
@@ -216,6 +221,7 @@ async def verify_with_db_only(hashed_key: str):
 
             payload = {
                 "status": ApiKeyStatus.active.value,
+                "api_key_id": str(api_key_row.id),
                 "tenant_id": str(api_key_row.tenant_id),
                 "organization_id": str(api_key_row.organization_id),
             }
@@ -256,6 +262,7 @@ def _process_cache(
         raise HTTPException(detail="Api key is revoked", status_code=401)
 
     return {
+        "api_key_id": cached["api_key_id"],
         "tenant_id": cached["tenant_id"],
         "organization_id": cached["organization_id"],
         "status": cached["status"],

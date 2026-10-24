@@ -30,6 +30,5 @@ async def remove_api_key_from_cache(hashed_api_key: str) -> bool:
 
     redis = get_redis()
 
-    # exists check + delete - delete is idempotent anyway
-    deleted = await redis.delete(hashed_api_key)
+    deleted = await redis.delete(f"vtx:{hashed_api_key}", hashed_api_key)
     return deleted > 0
