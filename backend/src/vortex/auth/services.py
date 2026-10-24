@@ -196,12 +196,13 @@ class RefreshTokenService:
             logger.warning("Refresh token rotation rejected: token expired")
             raise RefreshTokenExpiredError
 
-        membership = await MembershipService.get_membership(
-            db_session=db_session,
-            org_id=existing_token.org_id,
-            user_id=existing_token.user_id,
-        )
-        if (not membership) or (not membership.is_active):
+        try:
+            membership = await MembershipService.get_active_membership(
+                db_session=db_session,
+                org_id=existing_token.org_id,
+                user_id=existing_token.user_id,
+            )
+        except NotAMemberError:
             logger.warning("Refresh token rotation rejected: inactive membership")
             raise RefreshTokenExpiredError
 
