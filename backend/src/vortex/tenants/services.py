@@ -148,12 +148,6 @@ class ApiKeyService:
         tenant_id: str, api_key_id: str, db_session: AsyncSession
     ) -> None:
 
-        # check if this api is already revoked or not
-        if await ApiKeyRepository.check_non_active_api_key_exists(
-            api_key_id=api_key_id, tenant_id=tenant_id, db_session=db_session
-        ):
-            raise ApiKeyAlreadyNonActiveError
-
         # now mark in db as grace and add the grace time also
         GRACE_PERIOD_MINS = (get_settings()).project.grace_period_mins
 
@@ -166,6 +160,15 @@ class ApiKeyService:
             grace_period=grace_period,
             db_session=db_session,
         )
+
+        # Active keys are handled by the update above. Check status only when it
+        # matched no active row, which saves a query for the normal revoke path.
+        if hashed_api_key is None:
+            is_non_active = await ApiKeyRepository.check_non_active_api_key_exists(
+                api_key_id=api_key_id, tenant_id=tenant_id, db_session=db_session
+            )
+            if is_non_active:
+                raise ApiKeyAlreadyNonActiveError
 
         # now marked in db as grace
         # now remove the key from redis
@@ -194,22 +197,21 @@ class ApiKeyService:
     ) -> dict:
 
         # step 1 -> check if this key is already revoked or in grace period
-        if await ApiKeyRepository.check_non_active_api_key_exists(
+        # Check the new slug in the same query before changing the existing key.
+        is_non_active, slug_exists = await ApiKeyRepository.get_rotation_conflicts(
             api_key_id=payload.api_key_id,
             tenant_id=payload.tenant_id,
+            api_key_slug=payload.api_key_slug,
             db_session=db_session,
-        ):
+        )
+        if is_non_active:
             logger.warning("API key rotation rejected: key is already inactive")
             raise ApiKeyAlreadyNonActiveError
 
         # imp check if slug exists before marking as graced
         # if we grace the api first and then check slug
         # if slug fails the api key is already graced
-        if await ApiKeyRepository.check_by_api_key_slug(
-            api_key_slug=payload.api_key_slug,
-            tenant_id=payload.tenant_id,
-            db_session=db_session,
-        ):
+        if slug_exists:
             logger.warning("API key rotation rejected: slug already exists")
             raise SlugAlreadyExistsErorr
 

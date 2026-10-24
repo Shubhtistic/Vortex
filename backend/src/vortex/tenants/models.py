@@ -65,7 +65,7 @@ class ApiKey(SQLModel, table=True):
     api_key_raw_preview: str = Field(max_length=5)
 
     # actual hashed value
-    hashed_key: str
+    hashed_key: str = Field(index=True)
 
     status: ApiKeyStatus = Field(default=ApiKeyStatus.active)
 

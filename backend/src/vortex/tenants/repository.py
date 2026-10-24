@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.shared.database import create, check_exists, execute_query, get_all
+from src.vortex.shared.database import create, check_exists, execute_query
 
 from .enums import ApiKeyStatus, TenantStatus
 from .models import ApiKey, Tenant
@@ -32,23 +32,19 @@ class TenantRepository:
         db_session: AsyncSession,
         offset: int,
         limit: int,
-    ) -> Optional[list[Tenant]]:
+    ) -> tuple[list[Tenant], int]:
         """get all tenants for this organisation"""
 
         # get total count
-        count_qry = (
+        count_stmt = (
             select(func.count())
             .select_from(Tenant)
             .where(Tenant.organization_id == org_id)
         )
 
-        total_count = (
-            await execute_query(query=count_qry, db_session=db_session)
-        ).scalar_one()
-
         # get paginated data
         query = (
-            select(Tenant)
+            select(Tenant, count_stmt.scalar_subquery().label("total_count"))
             .where(
                 Tenant.organization_id == org_id, Tenant.status == TenantStatus.active
             )
@@ -57,7 +53,15 @@ class TenantRepository:
             .offset(offset)
         )
 
-        data = await get_all(stmt=query, db_session=db_session)
+        result = await execute_query(query=query, db_session=db_session)
+        rows = result.all()
+        data = [row[0] for row in rows]
+        if rows:
+            total_count = rows[0].total_count
+        else:
+            # The page can be empty while inactive tenants still contribute to its total.
+            count_result = await execute_query(query=count_stmt, db_session=db_session)
+            total_count = count_result.scalar_one()
 
         return data, total_count
 
@@ -95,32 +99,61 @@ class ApiKeyRepository:
         return result.scalar() is not None
 
     @staticmethod
+    async def get_rotation_conflicts(
+        api_key_id: str,
+        tenant_id: str,
+        api_key_slug: str,
+        db_session: AsyncSession,
+    ) -> tuple[bool, bool]:
+        """Check both rotation preconditions in one database round trip."""
+        stmt = select(
+            exists().where(
+                ApiKey.id == api_key_id,
+                ApiKey.tenant_id == tenant_id,
+                ApiKey.status != ApiKeyStatus.active,
+            ).label("is_non_active"),
+            exists().where(
+                ApiKey.api_key_slug == api_key_slug,
+                ApiKey.tenant_id == tenant_id,
+            ).label("slug_exists"),
+        )
+        result = await execute_query(query=stmt, db_session=db_session)
+        row = result.one()
+        return row.is_non_active, row.slug_exists
+
+    @staticmethod
     async def get_all_api_keys(
         tenant_id: str, db_session: AsyncSession, offset: int, limit: int
-    ):
+    ) -> tuple[list[ApiKey], int]:
 
         # get total count
-        total_count_qry = (
+        total_count_stmt = (
             select(func.count())
             .select_from(ApiKey)
             .where(ApiKey.tenant_id == tenant_id)
         )
 
-        total = (
-            await execute_query(query=total_count_qry, db_session=db_session)
-        ).scalar_one()
-
         # get paginated data
 
         query = (
-            select(ApiKey)
+            select(ApiKey, total_count_stmt.scalar_subquery().label("total_count"))
             .where(ApiKey.tenant_id == tenant_id, ApiKey.status == ApiKeyStatus.active)
             .order_by(ApiKey.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
 
-        results = await get_all(stmt=query, db_session=db_session)
+        result = await execute_query(query=query, db_session=db_session)
+        rows = result.all()
+        results = [row[0] for row in rows]
+        if rows:
+            total = rows[0].total_count
+        else:
+            # Inactive keys contribute to the total even if this active-key page is empty.
+            count_result = await execute_query(
+                query=total_count_stmt, db_session=db_session
+            )
+            total = count_result.scalar_one()
 
         return results, total
 

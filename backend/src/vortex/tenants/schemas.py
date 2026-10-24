@@ -38,9 +38,7 @@ class CreateApiKeyRequest(BaseModel):
     api_key_slug: str = Field(min_length=1, max_length=20)
     tenant_id: UUID | str
 
-    _validate_text = field_validator("api_key_slug", "tenant_id")(
-        reject_blank_text
-    )
+    _validate_text = field_validator("api_key_slug", "tenant_id")(reject_blank_text)
 
 
 # --- read an api key ---
@@ -60,6 +58,6 @@ class ApiKeyRotateRequest(BaseModel):
     tenant_id: str
     api_key_slug: str = Field(min_length=1, max_length=20)
 
-    _validate_text = field_validator(
-        "api_key_id", "tenant_id", "api_key_slug"
-    )(reject_blank_text)
+    _validate_text = field_validator("api_key_id", "tenant_id", "api_key_slug")(
+        reject_blank_text
+    )
