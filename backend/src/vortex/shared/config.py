@@ -75,6 +75,48 @@ class RedisSettings(CommonSettings):
         validation_alias="REDIS_TLS",
     )
 
+    max_connections: int = Field(
+        default=50,
+        ge=1,
+        validation_alias="REDIS_MAX_CONNECTIONS",
+    )
+
+    pool_timeout_seconds: float = Field(
+        default=0.5,
+        gt=0,
+        validation_alias="REDIS_POOL_TIMEOUT_SECONDS",
+    )
+
+    socket_timeout_seconds: float = Field(
+        default=2.0,
+        gt=0,
+        validation_alias="REDIS_SOCKET_TIMEOUT_SECONDS",
+    )
+
+    api_key_cache_ttl_seconds: int = Field(
+        default=30,
+        ge=1,
+        validation_alias="API_KEY_CACHE_TTL_SECONDS",
+    )
+
+    api_key_cache_max_size: int = Field(
+        default=10_000,
+        ge=1,
+        validation_alias="API_KEY_CACHE_MAX_SIZE",
+    )
+
+    db_fallback_concurrency: int = Field(
+        default=5,
+        ge=1,
+        validation_alias="REDIS_DB_FALLBACK_CONCURRENCY",
+    )
+
+    db_fallback_wait_seconds: float = Field(
+        default=0.5,
+        gt=0,
+        validation_alias="REDIS_DB_FALLBACK_WAIT_SECONDS",
+    )
+
     @property
     def redis_url(self) -> str:
         scheme = "rediss" if self.redis_tls else "redis"
@@ -164,7 +206,6 @@ class CORSSettings(CommonSettings):
 class RedpandaSettings(CommonSettings):
 
     bootstrap_servers: str = Field(
-        default="localhost:9092",
         validation_alias="REDPANDA_BOOTSTRAP_SERVERS",
     )
 
@@ -223,6 +264,40 @@ class RedpandaSettings(CommonSettings):
     )
 
 
+# --- Event ingestion buffer ---
+class EventBufferSettings(CommonSettings):
+
+    max_batch_size: int = Field(
+        default=1000,
+        ge=1,
+        validation_alias="EVENT_BUFFER_MAX_BATCH_SIZE",
+    )
+
+    flush_interval_seconds: float = Field(
+        default=1.0,
+        gt=0,
+        validation_alias="EVENT_BUFFER_FLUSH_INTERVAL_SECONDS",
+    )
+
+    max_pending_events: int = Field(
+        default=50_000,
+        ge=1,
+        validation_alias="EVENT_BUFFER_MAX_PENDING_EVENTS",
+    )
+
+    max_pending_bytes: int = Field(
+        default=67_108_864,
+        ge=1,
+        validation_alias="EVENT_BUFFER_MAX_PENDING_BYTES",
+    )
+
+    shutdown_timeout_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        validation_alias="EVENT_BUFFER_SHUTDOWN_TIMEOUT_SECONDS",
+    )
+
+
 # --- Main Settings ---
 class Settings(CommonSettings):
 
@@ -233,6 +308,7 @@ class Settings(CommonSettings):
     project: ProjectSettings = Field(default_factory=ProjectSettings)
     cors: CORSSettings = Field(default_factory=CORSSettings)
     redpanda: RedpandaSettings = Field(default_factory=RedpandaSettings)
+    event_buffer: EventBufferSettings = Field(default_factory=EventBufferSettings)
 
 
 @lru_cache

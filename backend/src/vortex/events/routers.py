@@ -4,21 +4,15 @@ from fastapi import APIRouter, Request
 
 from src.vortex.tenants.dependencies import VerifyApiKeyDep
 from src.vortex.shared.responses import ApiResponse
-from src.vortex.shared.config import get_settings
-from src.vortex.shared.redpanda_client import RedpandaProducer
 
-from .schemas import EventRequestSchema
+from .buffer import enqueue_events
+from .schemas import EventBatchSchema, EventRequestSchema
 
 # --- router ---
 router = APIRouter(prefix="", tags=["events"])
 
 
-@router.post("/events")
-async def ingest_event(
-    payload: EventRequestSchema,
-    request: Request,
-    api_key_info: VerifyApiKeyDep,
-):
+def _event_payload(payload: EventRequestSchema, request: Request, api_key_info: dict):
     event = payload.model_dump()
     event["raw_payload"] = event.copy()
     event["tenant_id"] = api_key_info["tenant_id"]
@@ -28,10 +22,18 @@ async def ingest_event(
     user_agent = request.headers.get("user-agent")
     event["user_agent"] = user_agent[:500] if user_agent else None
     event["received_at"] = datetime.now(timezone.utc)
+    return event
 
-    await RedpandaProducer.send_event(
-        event,
-        topic=get_settings().redpanda.events_topic,
+
+@router.post("/events")
+async def ingest_events(
+    payload: EventBatchSchema,
+    request: Request,
+    api_key_info: VerifyApiKeyDep,
+):
+    events = [_event_payload(item, request, api_key_info) for item in payload]
+    enqueue_events(events)
+
+    return ApiResponse.success(
+        message=f"Accepted {len(events)} events for processing", code=202
     )
-
-    return ApiResponse.success(message="Successfully sent the event", code=202)

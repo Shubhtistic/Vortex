@@ -1,5 +1,5 @@
 import asyncio, logging, contextlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
 import orjson as redpanda_orjson
@@ -125,59 +125,79 @@ class RedpandaProducer:
             logger.info("Redpanda producer stopped")
 
     @staticmethod
-    async def send_event(
-        payload: Mapping[str, Any],
+    async def send_events(
+        payloads: Sequence[Mapping[str, Any]],
         topic: str,
         partition: Optional[int] = None,
-    ) -> dict[str, Any]:
-        """Publish an event without a key so the partitioner can distribute it."""
-        return await RedpandaProducer._send(
-            payload=payload,
-            topic=topic,
-            partition=partition,
-        )
-
-    @staticmethod
-    async def _send(
-        payload: Mapping[str, Any],
-        topic: str,
-        partition: Optional[int],
-    ) -> dict[str, Any]:
+    ) -> list[dict[str, Any]]:
+        """Queue a batch together, then await all Redpanda delivery futures."""
         producer = _redpanda_producer
         if producer is None:
             raise RedpandaNotStartedError("Redpanda producer is not started")
+        if not payloads:
+            return []
 
         try:
-            value = redpanda_orjson.dumps(
-                payload, option=redpanda_orjson.OPT_NON_STR_KEYS
-            )
+            values = [
+                redpanda_orjson.dumps(
+                    payload, option=redpanda_orjson.OPT_NON_STR_KEYS
+                )
+                for payload in payloads
+            ]
         except redpanda_orjson.JSONEncodeError as exc:
             raise RedpandaPublishError(f"Payload is not serializable: {exc}") from exc
 
         try:
-            metadata = await asyncio.wait_for(
-                producer.send_and_wait(
-                    topic=topic,
-                    value=value,
-                    partition=partition,
-                ),
-                timeout=settings.redpanda.send_timeout_seconds,
-            )
+            # Queue every record first so the producer can fill its partition batches,
+            # then await the delivery acknowledgements within one overall deadline.
+            async with asyncio.timeout(settings.redpanda.send_timeout_seconds):
+                queued = await asyncio.gather(
+                    *(
+                        producer.send(topic=topic, value=value, partition=partition)
+                        for value in values
+                    ),
+                    return_exceptions=True,
+                )
+                queue_errors = [
+                    item for item in queued if isinstance(item, BaseException)
+                ]
+                delivery_futures = [
+                    item for item in queued if not isinstance(item, BaseException)
+                ]
+                delivered = await asyncio.gather(
+                    *delivery_futures,
+                    return_exceptions=True,
+                )
+                delivery_errors = [
+                    item for item in delivered if isinstance(item, BaseException)
+                ]
+                errors = queue_errors + delivery_errors
+                if errors:
+                    if isinstance(errors[0], asyncio.CancelledError):
+                        raise errors[0]
+                    raise RedpandaPublishError(
+                        f"Could not publish every event in batch ({len(errors)} failures)"
+                    ) from errors[0]
+                metadata_items = delivered
         except asyncio.TimeoutError as exc:
-            logger.error("Redpanda send timed out")
-            raise RedpandaPublishError("Timed out publishing to Redpanda") from exc
+            logger.error("Redpanda batch send timed out (count=%d)", len(payloads))
+            raise RedpandaPublishError("Timed out publishing batch to Redpanda") from exc
         except RedpandaClientError as exc:
-            logger.error("Redpanda send failed: %s", exc)
+            logger.error("Redpanda batch send failed: %s", exc)
             raise RedpandaPublishError(f"Redpanda publish failed: {exc}") from exc
 
         logger.info(
-            "Message published (topic=%s partition=%d offset=%d)",
-            metadata.topic,
-            metadata.partition,
-            metadata.offset,
+            "Batch published (topic=%s count=%d first_partition=%d first_offset=%d)",
+            topic,
+            len(metadata_items),
+            metadata_items[0].partition,
+            metadata_items[0].offset,
         )
-        return {
-            "topic": metadata.topic,
-            "partition": metadata.partition,
-            "offset": metadata.offset,
-        }
+        return [
+            {
+                "topic": metadata.topic,
+                "partition": metadata.partition,
+                "offset": metadata.offset,
+            }
+            for metadata in metadata_items
+        ]

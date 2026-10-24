@@ -1,28 +1,47 @@
 import asyncio, hmac, orjson
 import logging
 import random
+from contextlib import asynccontextmanager
 from typing import Annotated, Optional
 from datetime import datetime, timezone
+from cachetools import TTLCache
 from fastapi import Depends, Header, HTTPException, status as http_status
 from redis.asyncio import Redis
-from redis.exceptions import RedisError
+from redis.exceptions import (
+    ConnectionError as RedisConnectionError,
+    LockError,
+    RedisError,
+    TimeoutError as RedisTimeoutError,
+)
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.vortex.shared.database import get_session_factory
 
-from src.vortex.shared.redis_client import get_redis
+from src.vortex.shared.config import get_settings
+from src.vortex.shared.redis_client import RedisPoolSaturatedError, get_redis
 
 from .models import ApiKeyStatus
 from .repository import ApiKeyRepository
 from .utils import hash_api_key
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 # ========= TTL & LOCK VALUES ===========
 LOCK_TIMEOUT = 5
 LOCK_BLOCKING_TIMEOUT = 2
+LOCK_CACHE_RECHECK_ATTEMPTS = 10
+LOCK_CACHE_RECHECK_INTERVAL = 0.05
 ACTIVE_KEY_TTL = 360
 REVOKED_KEY_TTL = 300
+
+_api_key_cache: TTLCache[str, dict] = TTLCache(
+    maxsize=settings.redis.api_key_cache_max_size,
+    ttl=settings.redis.api_key_cache_ttl_seconds,
+)
+_api_key_locks: dict[str, tuple[asyncio.Lock, int]] = {}
+_api_key_locks_guard = asyncio.Lock()
+_db_fallback_semaphore = asyncio.Semaphore(settings.redis.db_fallback_concurrency)
 
 
 # --- main function ----
@@ -37,18 +56,145 @@ async def verify_api_key(
 
     hashed_key = hash_api_key(x_api_key)
     cache_key = f"vtx:{hashed_key}"
-    try:
-        redis = get_redis()
-        return await _verify_using_cache_and_db(
-            redis=redis,
-            hashed_key=hashed_key,
-            cache_key=cache_key,
-        )
-    except RedisError as e:
-        logger.exception("Redis unavailable during API key verification")
-        # try using only db if redis is down
+    cached = _get_local_cached_key(hashed_key)
+    if cached is not None:
+        return _process_cache(cached)
 
+    # A process-local single-flight lock keeps concurrent requests for a hot
+    # key from all querying Redis while its local cache entry is missing.
+    async with _singleflight_api_key(cache_key):
+        cached = _get_local_cached_key(hashed_key)
+        if cached is not None:
+            return _process_cache(cached)
+
+        redis = get_redis()
+        try:
+            result = await _verify_using_cache_and_db(
+                redis=redis,
+                hashed_key=hashed_key,
+                cache_key=cache_key,
+            )
+        except LockError:
+            # A lock timeout means another process may still be filling Redis.
+            # Recheck briefly before using the bounded database fallback.
+            logger.debug("Timed out waiting for API key cache lock; rechecking cache")
+            try:
+                cached = await _wait_for_cached_key(redis=redis, cache_key=cache_key)
+            except RedisPoolSaturatedError:
+                raise _redis_saturated_response()
+            except RedisTimeoutError:
+                raise _redis_saturated_response()
+            except RedisConnectionError:
+                logger.exception("Redis unavailable while rechecking API key cache")
+                result = await _bounded_db_fallback(hashed_key)
+            except RedisError:
+                logger.exception("Redis error while rechecking API key cache")
+                raise _redis_error_response()
+            else:
+                if cached:
+                    result = _process_cache(cached)
+                else:
+                    logger.warning(
+                        "API key cache remained empty after lock timeout; "
+                        "verifying against DB"
+                    )
+                    result = await _bounded_db_fallback(hashed_key)
+        except RedisPoolSaturatedError:
+            raise _redis_saturated_response()
+        except RedisTimeoutError:
+            raise _redis_saturated_response()
+        except RedisConnectionError:
+            logger.exception("Redis unavailable during API key verification")
+            result = await _bounded_db_fallback(hashed_key)
+        except RedisError:
+            logger.exception("Redis error during API key verification")
+            raise _redis_error_response()
+
+        _cache_api_key_result(hashed_key, result)
+        return result
+
+
+def _redis_saturated_response() -> HTTPException:
+    logger.warning("Redis connection pool saturated during API key verification")
+    return HTTPException(
+        status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Authentication is temporarily busy; retry shortly",
+        headers={"Retry-After": "1"},
+    )
+
+
+def _redis_error_response() -> HTTPException:
+    return HTTPException(
+        status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Authentication service is temporarily unavailable",
+        headers={"Retry-After": "1"},
+    )
+
+
+def _get_local_cached_key(hashed_key: str) -> Optional[dict]:
+    return _api_key_cache.get(hashed_key)
+
+
+def _cache_api_key_result(hashed_key: str, result: dict) -> None:
+    # Grace-period keys may expire before the general local-cache TTL ends.
+    if result.get("status") == ApiKeyStatus.grace_period.value:
+        return
+    _api_key_cache[hashed_key] = result
+
+
+@asynccontextmanager
+async def _singleflight_api_key(cache_key: str):
+    async with _api_key_locks_guard:
+        entry = _api_key_locks.get(cache_key)
+        if entry is None:
+            lock = asyncio.Lock()
+            _api_key_locks[cache_key] = (lock, 1)
+        else:
+            lock, users = entry
+            _api_key_locks[cache_key] = (lock, users + 1)
+
+    try:
+        async with lock:
+            yield
+    finally:
+        async with _api_key_locks_guard:
+            lock, users = _api_key_locks[cache_key]
+            if users == 1:
+                _api_key_locks.pop(cache_key, None)
+            else:
+                _api_key_locks[cache_key] = (lock, users - 1)
+
+
+async def _bounded_db_fallback(hashed_key: str) -> dict:
+    try:
+        await asyncio.wait_for(
+            _db_fallback_semaphore.acquire(),
+            timeout=settings.redis.db_fallback_wait_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily busy; retry shortly",
+            headers={"Retry-After": "1"},
+        ) from exc
+
+    try:
         return await verify_with_db_only(hashed_key=hashed_key)
+    finally:
+        _db_fallback_semaphore.release()
+
+
+async def _wait_for_cached_key(redis: Redis, cache_key: str) -> Optional[dict]:
+    """Recheck briefly while the request holding the cache lock fills the key."""
+    for attempt in range(LOCK_CACHE_RECHECK_ATTEMPTS):
+        cached = await _get_cached(redis=redis, cache_key=cache_key)
+        if cached:
+            return cached
+
+        if attempt + 1 < LOCK_CACHE_RECHECK_ATTEMPTS:
+            await asyncio.sleep(LOCK_CACHE_RECHECK_INTERVAL)
+
+    return None
 
 
 async def _verify_using_cache_and_db(

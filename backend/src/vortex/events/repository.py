@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from typing import Any
+from itertools import islice
+from typing import Any, Iterable, TypeVar
 from uuid import UUID, uuid7
 
 from sqlalchemy import case, delete, select, tuple_, update
@@ -10,6 +11,26 @@ from src.vortex.shared.database import execute_query
 
 from .consts import EVENTS_INSERT_CHUNK_SIZE
 from .models import Event, Group, Person, PersonDistinctId, PersonGroup
+
+MAX_BIND_PARAMETERS = 32_767
+T = TypeVar("T")
+
+
+def _chunks(values: Iterable[T], chunk_size: int) -> Iterable[list[T]]:
+    iterator = iter(values)
+    while chunk := list(islice(iterator, chunk_size)):
+        yield chunk
+
+
+def _safe_insert_chunk_size(model: Any, preferred_size: int) -> int:
+    # SQLAlchemy emits one bind parameter per populated column in each row.
+    column_count = len(model.__table__.columns)
+    return min(preferred_size, MAX_BIND_PARAMETERS // column_count)
+
+
+def _safe_mapping_chunk_size(bind_parameters_per_item: int = 3) -> int:
+    # CASE updates also bind each mapping key in the WHERE IN clause.
+    return MAX_BIND_PARAMETERS // bind_parameters_per_item
 
 
 class EventRepository:
@@ -31,8 +52,8 @@ class EventRepository:
             unique_rows.append(row)
 
         # Keep each statement below PostgreSQL's bind-parameter limit.
-        for start in range(0, len(unique_rows), EVENTS_INSERT_CHUNK_SIZE):
-            batch = unique_rows[start : start + EVENTS_INSERT_CHUNK_SIZE]
+        chunk_size = _safe_insert_chunk_size(Event, EVENTS_INSERT_CHUNK_SIZE)
+        for batch in _chunks(unique_rows, chunk_size):
             stmt = (
                 pg_insert(Event)
                 .values(batch)
@@ -57,12 +78,16 @@ class EventRepository:
         }
         if not person_merges:
             return
-        stmt = (
-            update(Event)
-            .where(Event.person_id.in_(person_merges))
-            .values(person_id=case(person_merges, value=Event.person_id))
-        )
-        await execute_query(query=stmt, db_session=session)
+        for batch in _chunks(
+            person_merges.items(), _safe_mapping_chunk_size()
+        ):
+            mapping = dict(batch)
+            stmt = (
+                update(Event)
+                .where(Event.person_id.in_(mapping))
+                .values(person_id=case(mapping, value=Event.person_id))
+            )
+            await execute_query(query=stmt, db_session=session)
 
 
 class PersonRepository:
@@ -72,18 +97,22 @@ class PersonRepository:
     ) -> dict[UUID, Person]:
         if not person_ids:
             return {}
-        stmt = (
-            select(Person)
-            .where(Person.id.in_(person_ids))
-            .execution_options(populate_existing=True)
-        )
-        result = await execute_query(query=stmt, db_session=session)
-        return {person.id: person for person in result.scalars()}
+        people: dict[UUID, Person] = {}
+        for batch in _chunks(person_ids, MAX_BIND_PARAMETERS):
+            stmt = (
+                select(Person)
+                .where(Person.id.in_(batch))
+                .execution_options(populate_existing=True)
+            )
+            result = await execute_query(query=stmt, db_session=session)
+            people.update({person.id: person for person in result.scalars()})
+        return people
 
     @staticmethod
     async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
-        if rows:
-            stmt = pg_insert(Person).values(rows).on_conflict_do_nothing()
+        chunk_size = _safe_insert_chunk_size(Person, 5000)
+        for batch in _chunks(rows, chunk_size):
+            stmt = pg_insert(Person).values(batch).on_conflict_do_nothing()
             await execute_query(query=stmt, db_session=session)
 
     @staticmethod
@@ -92,20 +121,24 @@ class PersonRepository:
     ) -> None:
         if not updates:
             return
-        stmt = (
-            update(Person)
-            .where(Person.id.in_(updates))
-            .values(
-                properties=case(updates, value=Person.id, else_=Person.properties),
-                updated_at=datetime.now(timezone.utc),
+        for batch in _chunks(updates.items(), _safe_mapping_chunk_size()):
+            mapping = dict(batch)
+            stmt = (
+                update(Person)
+                .where(Person.id.in_(mapping))
+                .values(
+                    properties=case(
+                        mapping, value=Person.id, else_=Person.properties
+                    ),
+                    updated_at=datetime.now(timezone.utc),
+                )
             )
-        )
-        await execute_query(query=stmt, db_session=session)
+            await execute_query(query=stmt, db_session=session)
 
     @staticmethod
     async def delete_many(person_ids: set[UUID], session: AsyncSession) -> None:
-        if person_ids:
-            stmt = delete(Person).where(Person.id.in_(person_ids))
+        for batch in _chunks(person_ids, MAX_BIND_PARAMETERS):
+            stmt = delete(Person).where(Person.id.in_(batch))
             await execute_query(query=stmt, db_session=session)
 
 
@@ -116,24 +149,30 @@ class PersonDistinctIdRepository:
     ) -> dict[tuple[UUID, str], UUID]:
         if not identities:
             return {}
-        stmt = select(
-            PersonDistinctId.tenant_id,
-            PersonDistinctId.distinct_id,
-            PersonDistinctId.person_id,
-        ).where(
-            tuple_(PersonDistinctId.tenant_id, PersonDistinctId.distinct_id).in_(
-                identities
+        found: dict[tuple[UUID, str], UUID] = {}
+        for batch in _chunks(identities, MAX_BIND_PARAMETERS // 2):
+            stmt = select(
+                PersonDistinctId.tenant_id,
+                PersonDistinctId.distinct_id,
+                PersonDistinctId.person_id,
+            ).where(
+                tuple_(PersonDistinctId.tenant_id, PersonDistinctId.distinct_id).in_(
+                    batch
+                )
             )
-        )
-        result = await execute_query(query=stmt, db_session=session)
-        return {(row.tenant_id, row.distinct_id): row.person_id for row in result}
+            result = await execute_query(query=stmt, db_session=session)
+            found.update(
+                {(row.tenant_id, row.distinct_id): row.person_id for row in result}
+            )
+        return found
 
     @staticmethod
     async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
-        for start in range(0, len(rows), 5000):
+        chunk_size = _safe_insert_chunk_size(PersonDistinctId, 5000)
+        for batch in _chunks(rows, chunk_size):
             stmt = (
                 pg_insert(PersonDistinctId)
-                .values(rows[start : start + 5000])
+                .values(batch)
                 .on_conflict_do_nothing(index_elements=["tenant_id", "distinct_id"])
             )
             await execute_query(query=stmt, db_session=session)
@@ -157,12 +196,14 @@ class PersonDistinctIdRepository:
         }
         if not person_merges:
             return
-        stmt = (
-            update(PersonDistinctId)
-            .where(PersonDistinctId.person_id.in_(person_merges))
-            .values(person_id=case(person_merges, value=PersonDistinctId.person_id))
-        )
-        await execute_query(query=stmt, db_session=session)
+        for batch in _chunks(person_merges.items(), _safe_mapping_chunk_size()):
+            mapping = dict(batch)
+            stmt = (
+                update(PersonDistinctId)
+                .where(PersonDistinctId.person_id.in_(mapping))
+                .values(person_id=case(mapping, value=PersonDistinctId.person_id))
+            )
+            await execute_query(query=stmt, db_session=session)
 
 
 class GroupRepository:
@@ -172,18 +213,24 @@ class GroupRepository:
     ) -> dict[tuple[UUID, str], Group]:
         if not identities:
             return {}
-        stmt = select(Group).where(
-            tuple_(Group.tenant_id, Group.group_key).in_(identities)
-        )
-        result = await execute_query(query=stmt, db_session=session)
-        return {(group.tenant_id, group.group_key): group for group in result.scalars()}
+        groups: dict[tuple[UUID, str], Group] = {}
+        for batch in _chunks(identities, MAX_BIND_PARAMETERS // 2):
+            stmt = select(Group).where(
+                tuple_(Group.tenant_id, Group.group_key).in_(batch)
+            )
+            result = await execute_query(query=stmt, db_session=session)
+            groups.update(
+                {(group.tenant_id, group.group_key): group for group in result.scalars()}
+            )
+        return groups
 
     @staticmethod
     async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
-        for start in range(0, len(rows), 5000):
+        chunk_size = _safe_insert_chunk_size(Group, 5000)
+        for batch in _chunks(rows, chunk_size):
             stmt = (
                 pg_insert(Group)
-                .values(rows[start : start + 5000])
+                .values(batch)
                 .on_conflict_do_nothing(index_elements=["tenant_id", "group_key"])
             )
             await execute_query(query=stmt, db_session=session)
@@ -194,15 +241,17 @@ class GroupRepository:
     ) -> None:
         if not updates:
             return
-        stmt = (
-            update(Group)
-            .where(Group.id.in_(updates))
-            .values(
-                properties=case(updates, value=Group.id, else_=Group.properties),
-                updated_at=datetime.now(timezone.utc),
+        for batch in _chunks(updates.items(), _safe_mapping_chunk_size()):
+            mapping = dict(batch)
+            stmt = (
+                update(Group)
+                .where(Group.id.in_(mapping))
+                .values(
+                    properties=case(mapping, value=Group.id, else_=Group.properties),
+                    updated_at=datetime.now(timezone.utc),
+                )
             )
-        )
-        await execute_query(query=stmt, db_session=session)
+            await execute_query(query=stmt, db_session=session)
 
 
 class PersonGroupRepository:
@@ -212,10 +261,11 @@ class PersonGroupRepository:
         for row in rows:
             unique_rows.setdefault((row["person_id"], row["group_id"]), row)
         rows = list(unique_rows.values())
-        for start in range(0, len(rows), 5000):
+        chunk_size = _safe_insert_chunk_size(PersonGroup, 5000)
+        for batch in _chunks(rows, chunk_size):
             stmt = (
                 pg_insert(PersonGroup)
-                .values(rows[start : start + 5000])
+                .values(batch)
                 .on_conflict_do_nothing(index_elements=["person_id", "group_id"])
             )
             await execute_query(query=stmt, db_session=session)
@@ -239,10 +289,12 @@ class PersonGroupRepository:
         }
         if not person_merges:
             return
-        stmt = select(PersonGroup.person_id, PersonGroup.group_id).where(
-            PersonGroup.person_id.in_(person_merges)
-        )
-        links = await execute_query(query=stmt, db_session=session)
+        links = []
+        for batch in _chunks(person_merges, MAX_BIND_PARAMETERS):
+            stmt = select(PersonGroup.person_id, PersonGroup.group_id).where(
+                PersonGroup.person_id.in_(batch)
+            )
+            links.extend(await execute_query(query=stmt, db_session=session))
         target_links = {
             (person_merges[source_id], group_id)
             for source_id, group_id in links
@@ -257,5 +309,6 @@ class PersonGroupRepository:
             for person_id, group_id in target_links
         ]
         await PersonGroupRepository.add_many(rows, session)
-        stmt = delete(PersonGroup).where(PersonGroup.person_id.in_(person_merges))
-        await execute_query(query=stmt, db_session=session)
+        for batch in _chunks(person_merges, MAX_BIND_PARAMETERS):
+            stmt = delete(PersonGroup).where(PersonGroup.person_id.in_(batch))
+            await execute_query(query=stmt, db_session=session)

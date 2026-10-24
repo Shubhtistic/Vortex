@@ -55,7 +55,9 @@ def get_session_factory():
 
 
 # --- Annotated Dep ---
-DbSessionDep = Annotated[AsyncSession, Depends(get_db_session)]
+DbSessionDep = Annotated[
+    AsyncSession, Depends(get_db_session, scope="function")
+]
 
 
 # --- CRUD Utils ---

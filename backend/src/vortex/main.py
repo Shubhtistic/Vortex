@@ -11,6 +11,7 @@ from src.vortex.shared.redis_client import init_redis, close_redis
 from src.vortex.api.routers import router as api_router
 from src.vortex.shared.logging_config import setup_logging
 from src.vortex.shared.config import get_settings
+from src.vortex.events.buffer import start_event_buffer, stop_event_buffer
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +26,14 @@ async def lifespan(app: FastAPI):
         await init_redis()
         logger.info("Application startup completed")
         await RedpandaProducer.start()
+        await start_event_buffer()
 
         yield
     except Exception:
         logger.exception("Application lifecycle failed")
         raise
     finally:
+        await stop_event_buffer()
         await RedpandaProducer.stop()
         await close_redis()
         logger.info("Application shutdown completed")

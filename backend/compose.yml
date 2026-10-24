@@ -10,9 +10,10 @@ services:
       - vortex_pg_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
-    cpus: "5.0"
-    mem_limit: 10g
-    mem_reservation: 8g
+    cpus: "1.5"
+    mem_limit: 3g
+    mem_reservation: 2g
+    shm_size: 1g
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -27,9 +28,9 @@ services:
       - ./src:/vortex/src
       - ./alembic:/vortex/alembic
       - ./alembic.ini:/vortex/alembic.ini
-    cpus: "0.6"
-    mem_limit: 640m
-    mem_reservation: 512m
+    cpus: "0.3"
+    mem_limit: 384m
+    mem_reservation: 256m
     depends_on:
       postgres:
         condition: service_healthy 
@@ -39,51 +40,74 @@ services:
     image: redis:7-bookworm
     ports:
       - "6380:6379"
-    cpus: "0.6"
-    mem_limit: 640m
-    mem_reservation: 512m
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       memory: 32M
-    #     limits:
-    #       memory: 128M
-    #       cpus: '0.25'
-
+    command:
+      - redis-server
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-192mb}
+      - --maxmemory-policy
+      - volatile-lru
+    cpus: "0.1"
+    mem_limit: 256m
+    mem_reservation: 128m
   fastapi:
     build:
       context: .
       target: builder
-    command: ["uvicorn", "src.vortex.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-    ports:
-      - "8000:8000"
-    cpus: "2.5"
-    mem_limit: 2560m
-    mem_reservation: 2g
+    command:
+      - uvicorn
+      - src.vortex.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+      - --workers
+      - "${UVICORN_WORKERS:-2}"
+      - --limit-concurrency
+      - "${UVICORN_LIMIT_CONCURRENCY:-2000}"
+    # Start three identical containers from this one service definition.
+    scale: 3
+    cpus: "1.0"
+    mem_limit: 1g
+    mem_reservation: 768m
     env_file:
       - .env
-    environment:
-      REDPANDA_BOOTSTRAP_SERVERS: redpanda:19092
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     volumes:
       - ./src:/vortex/src
       - ./alembic:/vortex/alembic
       - ./alembic.ini:/vortex/alembic.ini
       - /vortex/.venv
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       memory: 128M
-    #     limits:
-    #       memory: 512M
-    #       cpus: '0.50'
     depends_on:
       migrate:
         condition: service_completed_successfully  # migrations must finish before api starts
       redis:
-        condition: service_started 
+        condition: service_started
     networks:
       - default
       - my-redpanda-net
+
+  # Nginx is the public HTTP entry point; FastAPI stays on the Compose network.
+  nginx:
+    image: nginx:1.27.5
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - fastapi
+    cpus: "0.2"
+    mem_limit: 128m
+    mem_reservation: 64m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   # Redpanda consumer persists event batches to Postgres.
   event-processor:
@@ -92,13 +116,16 @@ services:
       target: builder
     command: ["python", "-m", "src.vortex.event_processor"]
     restart: unless-stopped
-    cpus: "2.5"
-    mem_limit: 2560m
-    mem_reservation: 2g
+    scale: 2
+    cpus: "0.5"
+    mem_limit: 768m
+    mem_reservation: 512m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     env_file:
       - .env
-    environment:
-      REDPANDA_BOOTSTRAP_SERVERS: redpanda:19092
     volumes:
       - ./src:/vortex/src
       - ./alembic:/vortex/alembic

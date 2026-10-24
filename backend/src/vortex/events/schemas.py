@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 from datetime import datetime, timezone
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -69,6 +69,11 @@ class EventRequestSchema(BaseModel):
     @classmethod
     def default_to_now_if_missing(cls, v: Optional[datetime]) -> datetime:
         return v or datetime.now(timezone.utc)
+
+
+EventBatchSchema = Annotated[
+    list[EventRequestSchema], Field(min_length=1, max_length=1000)
+]
 
 
 # --- read schema ---

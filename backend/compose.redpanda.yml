@@ -9,9 +9,11 @@
 #        docker network create my-redpanda-net
 #   2. Start Redpanda:
 #        docker compose -p redpanda-local -f compose.redpanda.yml up -d
-#      New auto-created topics use REDPANDA_EVENTS_PARTITIONS (default: 12).
-#   3. Check that Redpanda is healthy:
+#      Redpanda creates REDPANDA_EVENTS_TOPIC with
+#      REDPANDA_EVENTS_PARTITIONS (default: 12) during startup.
+#   3. Check that Redpanda is healthy and the topic exists:
 #        docker compose -p redpanda-local -f compose.redpanda.yml ps
+#        docker exec redpanda rpk topic describe vortex.events
 #   No .env file is needed. This setup is PLAINTEXT, for local development only.
 #
 # Use Redpanda from another Docker project:
@@ -41,9 +43,9 @@
 #   --advertise-rpc-addr (redpanda:33145), or clients will fail
 #   to reconnect after the first connection.
 #
-# New topics auto-created by clients use REDPANDA_EVENTS_PARTITIONS. This is a
-# cluster default, so it applies to every newly auto-created topic, not just
-# REDPANDA_EVENTS_TOPIC. Existing topics are not resized when this value changes.
+# The Redpanda service creates REDPANDA_EVENTS_TOPIC with the configured
+# partition count. Existing topics are not resized when that value changes;
+# update an existing topic explicitly if you change the count.
 #
 # To wipe all Redpanda data and start clean:
 #        docker compose -p redpanda-local -f compose.redpanda.yml down -v
@@ -55,26 +57,50 @@ services:
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v26.2.6
     container_name: redpanda
-    restart: unless-stopped
+    restart: on-failure:3
+    environment:
+      REDPANDA_EVENTS_TOPIC: ${REDPANDA_EVENTS_TOPIC:-vortex.events}
+      REDPANDA_EVENTS_PARTITIONS: ${REDPANDA_EVENTS_PARTITIONS:-12}
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - redpanda
-      - start
-      - --kafka-addr
-      - internal://0.0.0.0:19092,external://0.0.0.0:9092
-      - --advertise-kafka-addr
-      - internal://redpanda:19092,external://localhost:9092
-      - --rpc-addr
-      - redpanda:33145
-      - --advertise-rpc-addr
-      - redpanda:33145
-      - --mode
-      - dev-container
-      - --smp
-      - "2"
-      - --default-log-level=info
-    cpus: "2.5"
-    mem_limit: 5g
-    mem_reservation: 4g
+      - |
+        set -eu
+
+        rpk redpanda start \
+          --kafka-addr internal://0.0.0.0:19092,external://0.0.0.0:9092 \
+          --advertise-kafka-addr internal://redpanda:19092,external://localhost:9092 \
+          --rpc-addr redpanda:33145 \
+          --advertise-rpc-addr redpanda:33145 \
+          --mode dev-container \
+          --smp 1 \
+          --default-log-level=info &
+        redpanda_pid=$$!
+        trap 'kill -TERM "$$redpanda_pid" 2>/dev/null || true; wait "$$redpanda_pid"' TERM INT
+
+        attempt=1
+        delay=1
+        until rpk cluster health -X brokers=127.0.0.1:19092 >/dev/null 2>&1; do
+          if [ "$$attempt" -ge 6 ]; then
+            echo "Redpanda did not become ready; topic creation aborted" >&2
+            kill -TERM "$$redpanda_pid" 2>/dev/null || true
+            wait "$$redpanda_pid" || true
+            exit 1
+          fi
+          echo "Waiting for Redpanda before creating topic (attempt $$attempt/6; next check in $${delay}s)"
+          sleep "$$delay"
+          attempt=$$((attempt + 1))
+          if [ "$$delay" -lt 8 ]; then delay=$$((delay * 2)); fi
+        done
+
+        rpk topic create "$$REDPANDA_EVENTS_TOPIC" \
+          --partitions "$$REDPANDA_EVENTS_PARTITIONS" \
+          --if-not-exists \
+          -X brokers=127.0.0.1:19092
+
+        wait "$$redpanda_pid"
+    cpus: "1.0"
+    mem_limit: 2g
+    mem_reservation: 1536m
     ports:
       - "9092:9092" # for your host machine (localhost:9092)
     volumes:

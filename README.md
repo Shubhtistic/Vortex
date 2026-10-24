@@ -128,13 +128,13 @@ The frontend uses `NEXT_PUBLIC_API_URL`; the example points to `http://localhost
 
 ## Event flow
 
-1. A client sends an event to `POST /events` with an `X-API-Key` header.
-2. The API validates the event, adds server-owned organization, tenant, API key, receipt time, and request metadata, then publishes it to the configured Redpanda topic.
+1. A client sends an array of events (even for one event) to `POST /events` with an `X-API-Key` header.
+2. The API validates the events, adds server-owned organization, tenant, API key, receipt time, and request metadata, then places them in a bounded in-memory queue. A background worker flushes to Redpanda by batch size or timer.
 3. The event processor consumes records in batches. It resolves `distinct_id` values to people, processes valid identity links, resolves groups, and prepares event rows.
 4. Identity, group, and event changes are persisted in one PostgreSQL transaction. The consumer commits the corresponding Redpanda offsets only after the database transaction succeeds.
 5. The dashboard calls authenticated analytics endpoints, which query PostgreSQL by organization and optional tenant/date filters.
 
-The `202 Accepted` response from event ingestion means the event was published for processing; it does not mean that database persistence has finished. See [backend/README.md](backend/README.md) for data tables, APIs, and processing details.
+The `202 Accepted` response means the events entered the API process's in-memory queue; it does not mean Redpanda or PostgreSQL has persisted them. A forced process or host crash can lose queued events. See [backend/README.md](backend/README.md) for delivery behavior, tradeoffs, APIs, and processing details.
 
 ## Testing
 

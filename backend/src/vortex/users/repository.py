@@ -12,6 +12,8 @@ from src.vortex.shared.database import (
     get_one_by_query,
 )
 
+MAX_BIND_PARAMETERS = 32_767
+
 
 class UserRepository:
     @staticmethod
@@ -39,8 +41,14 @@ class UserRepository:
     async def get_by_ids(db_session: AsyncSession, user_ids: list[UUID]) -> list[User]:
         if not user_ids:
             return []
-        q = select(User).where(User.id.in_(user_ids), User.is_active == True)
-        return await get_all(stmt=q, db_session=db_session)
+        users: list[User] = []
+        for start in range(0, len(user_ids), MAX_BIND_PARAMETERS):
+            q = select(User).where(
+                User.id.in_(user_ids[start : start + MAX_BIND_PARAMETERS]),
+                User.is_active == True,
+            )
+            users.extend(await get_all(stmt=q, db_session=db_session))
+        return users
 
     @staticmethod
     async def get_user_by_id(user_id: UUID, db_session: AsyncSession) -> Optional[User]:

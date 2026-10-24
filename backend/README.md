@@ -27,11 +27,14 @@ flowchart LR
     Broker[("Redpanda topic")]
     Postgres[("PostgreSQL")]
     Cache[("Redis")]
+    Buffer["Events in-memory buffer / flusher"]
     ReadAPI["Analytics router / service / repository"]
     Dashboard["Dashboard client"]
 
     Client -->|"X-API-Key · POST /events"| Routes
     Routes --> Services
+    Services --> Buffer
+    Buffer --> Producer
     Producer --> Broker
     Broker --> Consumer
     Repos --> Postgres
@@ -47,14 +50,16 @@ sequenceDiagram
     autonumber
     participant Client
     participant API as FastAPI
+    participant Buffer as Event buffer
     participant RP as Redpanda
     participant Worker as Event processor
     participant DB as PostgreSQL
 
     Client->>API: POST /events with X-API-Key
     API->>API: Validate client event and attach trusted IDs
-    API->>RP: Publish JSON event
+    API->>Buffer: Enqueue event batch
     API-->>Client: 202 Accepted
+    Buffer->>RP: Publish when size or timer threshold is reached
     RP->>Worker: Deliver topic records
     Worker->>Worker: Validate records and form a batch
     Worker->>DB: Resolve identities and groups, then insert event rows
@@ -117,7 +122,7 @@ All routers are included through `api/routers.py`. Most responses use the shared
 
 | Method | Route | Authentication | Purpose |
 |---|---|---|---|
-| `POST` | `/events` | `X-API-Key` | Validate and publish one event for asynchronous processing. |
+| `POST` | `/events` | `X-API-Key` | Validate and publish a batch of 1–1,000 events for asynchronous processing. |
 | `GET` | `/analytics/overview` | Bearer token | Event, unique-user, and session totals with previous-period comparisons. |
 | `GET` | `/analytics/timeseries` | Bearer token | Event counts by hour or day. |
 | `GET` | `/analytics/top-events` | Bearer token | Most frequent event names. |
@@ -129,7 +134,9 @@ Analytics routes accept `from` and `to`, plus optional `event_name` and `tenant_
 
 ## Event processing and delivery
 
-`POST /events` validates the client payload using `EventRequestSchema`. The server derives organization, tenant, and API key IDs from the verified API key and adds receipt time and request metadata. It publishes to `REDPANDA_EVENTS_TOPIC` and returns `202` after the broker acknowledges the publish.
+`POST /events` accepts an array of 1–1,000 events, each validated using `EventRequestSchema`. Always send an array, even when it contains one event. The server derives organization, tenant, and API key IDs from the verified API key and adds receipt time and request metadata to every event. It places the batch in a bounded in-memory queue and returns `202`; a background task publishes queued events to `REDPANDA_EVENTS_TOPIC` when the flush size or timer is reached. If the queue is full, the API returns `503` with `Retry-After` so the client can retry.
+
+The queue is process memory, not durable storage. A forced process or host crash can lose events that received `202` but had not yet reached Redpanda. Use stable `insert_id` values when retrying requests, and use a durable outbox or queue if accepting events before broker acknowledgement must survive crashes.
 
 The `event-processor` runs `src.vortex.event_processor`. It consumes up to 5,000 records at a time with auto-commit disabled. It validates incoming records, skips malformed records, resolves person and group rows in bulk, and inserts processable events in a PostgreSQL transaction. For a record without a client `insert_id`, it derives a stable UUIDv5 from the topic, partition, and offset so replaying that same broker record does not duplicate its event row. Consumer offsets are committed after successful persistence.
 
