@@ -7,6 +7,4 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-    _validate_text = field_validator("org_slug", "email", "password")(
-        reject_blank_text
-    )
+    _validate_text = field_validator("org_slug", "email", "password")(reject_blank_text)
