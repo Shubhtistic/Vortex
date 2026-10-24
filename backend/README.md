@@ -57,7 +57,7 @@ sequenceDiagram
     API-->>Client: 202 Accepted
     RP->>Worker: Deliver topic records
     Worker->>Worker: Validate records and form a batch
-    Worker->>DB: Resolve identities and groups; insert event rows
+    Worker->>DB: Resolve identities and groups, then insert event rows
     DB-->>Worker: Commit transaction
     Worker->>RP: Commit offsets after DB commit
 ```
