@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Vortex backend architecture</title>
+  <desc id="desc">FastAPI receives authenticated API and event requests. Events are published to Redpanda, consumed by the event processor, and written with identity and group records to PostgreSQL. Analytics reads from PostgreSQL. Redis supports cache operations.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#7c8ba1" />
+    </marker>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, sans-serif; fill: #e8edf5; }
+      .title { font-size: 27px; font-weight: 700; }
+      .label { font-size: 16px; font-weight: 600; }
+      .detail { font-size: 13px; fill: #b6c2d2; }
+      .box { fill: #111b2a; stroke: #35465e; stroke-width: 1.5; rx: 14; }
+      .boundary { fill: #0b1220; stroke: #28384e; stroke-width: 1.5; stroke-dasharray: 7 6; rx: 20; }
+      .edge { fill: none; stroke: #7c8ba1; stroke-width: 2; marker-end: url(#arrow); }
+      .edge-label { font-size: 12px; fill: #aab7c8; }
+    </style>
+  </defs>
+  <rect width="1200" height="650" fill="#070b12" />
+  <text x="48" y="56" class="title">Vortex backend architecture</text>
+
+  <rect x="45" y="105" width="180" height="105" class="box" />
+  <text x="135" y="145" text-anchor="middle" class="label">Client applications</text>
+  <text x="135" y="172" text-anchor="middle" class="detail">Events and dashboard</text>
+  <text x="135" y="192" text-anchor="middle" class="detail">requests</text>
+
+  <rect x="285" y="85" width="285" height="310" class="boundary" />
+  <text x="307" y="117" class="label">FastAPI process</text>
+  <rect x="315" y="143" width="225" height="75" class="box" />
+  <text x="427" y="174" text-anchor="middle" class="label">Routers and services</text>
+  <text x="427" y="197" text-anchor="middle" class="detail">Auth · tenants · events · analytics</text>
+  <rect x="315" y="250" width="225" height="78" class="box" />
+  <text x="427" y="282" text-anchor="middle" class="label">Redpanda producer</text>
+  <text x="427" y="305" text-anchor="middle" class="detail">Publish accepted event records</text>
+  <rect x="315" y="345" width="225" height="34" class="box" />
+  <text x="427" y="368" text-anchor="middle" class="detail">Redis cache and auth state</text>
+
+  <rect x="635" y="105" width="190" height="100" class="box" />
+  <text x="730" y="146" text-anchor="middle" class="label">Redpanda</text>
+  <text x="730" y="174" text-anchor="middle" class="detail">Configured events topic</text>
+
+  <rect x="635" y="270" width="190" height="105" class="box" />
+  <text x="730" y="310" text-anchor="middle" class="label">Event processor</text>
+  <text x="730" y="338" text-anchor="middle" class="detail">Batch, resolve, persist</text>
+  <text x="730" y="358" text-anchor="middle" class="detail">then commit offsets</text>
+
+  <rect x="900" y="80" width="255" height="340" class="boundary" />
+  <text x="925" y="113" class="label">PostgreSQL</text>
+  <rect x="930" y="140" width="195" height="62" class="box" />
+  <text x="1027" y="177" text-anchor="middle" class="label">events</text>
+  <rect x="930" y="222" width="195" height="62" class="box" />
+  <text x="1027" y="259" text-anchor="middle" class="label">persons · distinct IDs</text>
+  <rect x="930" y="304" width="195" height="62" class="box" />
+  <text x="1027" y="341" text-anchor="middle" class="label">groups · person links</text>
+  <text x="1027" y="397" text-anchor="middle" class="detail">One transaction per processed batch</text>
+
+  <path d="M225 155 H315" class="edge" />
+  <text x="270" y="143" text-anchor="middle" class="edge-label">HTTP</text>
+  <path d="M427 218 V250" class="edge" />
+  <text x="438" y="239" class="edge-label">ingest</text>
+  <path d="M540 288 H635" class="edge" />
+  <text x="587" y="276" text-anchor="middle" class="edge-label">publish</text>
+  <path d="M730 205 V270" class="edge" />
+  <text x="744" y="244" class="edge-label">consume</text>
+  <path d="M825 322 H875 V171 H930" class="edge" />
+  <text x="866" y="310" text-anchor="middle" class="edge-label">persist</text>
+  <path d="M540 180 H880 V170 H930" class="edge" />
+  <text x="730" y="163" text-anchor="middle" class="edge-label">analytics reads</text>
+  <path d="M427 328 V345" class="edge" />
+  <text x="440" y="341" class="edge-label">cache</text>
+
+  <text x="48" y="492" class="label">Write path</text>
+  <text x="48" y="519" class="detail">Client → FastAPI → Redpanda → event processor → PostgreSQL</text>
+  <text x="48" y="566" class="label">Read path</text>
+  <text x="48" y="593" class="detail">Dashboard → authenticated analytics endpoints → PostgreSQL</text>
+</svg>
