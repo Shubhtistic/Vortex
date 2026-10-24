@@ -1,11 +1,8 @@
 import asyncio
 import logging
 import signal
-from datetime import datetime
 from typing import Any
-from uuid import UUID
 
-import orjson as redpanda_orjson
 from aiokafka import AIOKafkaConsumer as RedpandaConsumer
 from aiokafka.errors import KafkaError as RedpandaClientError
 from aiokafka.helpers import create_ssl_context as create_redpanda_ssl_context
@@ -15,10 +12,10 @@ from aiokafka.structs import (
 )
 
 from src.vortex.shared.config import get_settings
-from src.vortex.shared.database import SessionFactory, db_engine
+from src.vortex.shared.database import db_engine
+from src.vortex.shared.redpanda_client import RedpandaProducer
 
-from src.vortex.events.schemas import EventRequestSchema
-from src.vortex.events.services import EventService
+from src.vortex.events.record_processor import persist_records
 
 logger = logging.getLogger(__name__)
 BATCH_SIZE = 5000
@@ -46,52 +43,6 @@ def _consumer_config() -> dict[str, Any]:
     return config
 
 
-async def _persist(records: list[Any]) -> None:
-    values = []
-    for message in records:
-        try:
-            payload = redpanda_orjson.loads(message.value)
-            if not isinstance(payload, dict):
-                raise ValueError("event message must be a JSON object")
-            EventRequestSchema.model_validate(payload)
-            UUID(str(payload["tenant_id"]))
-            UUID(str(payload["organization_id"]))
-            UUID(str(payload["api_key_id"]))
-            received_at = payload.get("received_at")
-            if received_at is not None:
-                if not isinstance(received_at, str):
-                    raise ValueError("received_at must be an ISO 8601 string")
-                datetime.fromisoformat(received_at.replace("Z", "+00:00"))
-        except (
-            redpanda_orjson.JSONDecodeError,
-            ValueError,
-            KeyError,
-            TypeError,
-        ) as exc:
-            logger.warning(
-                "Skipping invalid Redpanda event (topic=%s partition=%s offset=%s): %s",
-                message.topic,
-                message.partition,
-                message.offset,
-                exc,
-            )
-            continue
-        values.append(
-            (
-                payload,
-                {
-                    "topic": message.topic,
-                    "partition": message.partition,
-                    "offset": message.offset,
-                },
-            )
-        )
-
-    if values:
-        async with SessionFactory.begin() as session:
-            await EventService.process_batch(values, session)
-
-
 async def run() -> None:
     settings = get_settings().redpanda
     consumer: RedpandaConsumer | None = None
@@ -102,6 +53,10 @@ async def run() -> None:
 
     pending_records: list[Any] = []
     try:
+        if settings.events_topic == settings.dlq_topic:
+            raise ValueError("REDPANDA_EVENTS_TOPIC and REDPANDA_DLQ_TOPIC must differ")
+
+        await RedpandaProducer.start()
         while not stop.is_set():
             consumer = RedpandaConsumer(settings.events_topic, **_consumer_config())
             try:
@@ -139,7 +94,7 @@ async def run() -> None:
             # until its complete Postgres transaction succeeds.
             while not stop.is_set():
                 try:
-                    await _persist(records)
+                    await persist_records(records)
                     offsets = {}
                     for message in records:
                         partition = RedpandaTopicPartition(
@@ -184,9 +139,14 @@ async def run() -> None:
                     await asyncio.sleep(1)
             consumer.resume(*consumer.assignment())
     finally:
-        if consumer is not None:
-            await consumer.stop()
-        await db_engine.dispose()
+        try:
+            if consumer is not None:
+                await consumer.stop()
+        finally:
+            try:
+                await RedpandaProducer.stop()
+            finally:
+                await db_engine.dispose()
 
 
 def main() -> None:

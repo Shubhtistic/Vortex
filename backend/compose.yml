@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17-bookworm
+    image: postgres:17.11-bookworm
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,13 +21,10 @@ services:
       retries: 3
   # alembic container
   migrate:
-    build: .
+    image: shubhtistic/vortex:v1.0.0
+    pull_policy: always
     env_file: .env
     command: alembic upgrade head # closes the container after this as pid 1 gets completed
-    volumes:
-      - ./src:/vortex/src
-      - ./alembic:/vortex/alembic
-      - ./alembic.ini:/vortex/alembic.ini
     cpus: "0.3"
     mem_limit: 384m
     mem_reservation: 256m
@@ -37,7 +34,7 @@ services:
 
   # redis
   redis:
-    image: redis:7-bookworm
+    image: redis:7.4.11-bookworm
     ports:
       - "6380:6379"
     command:
@@ -50,9 +47,8 @@ services:
     mem_limit: 256m
     mem_reservation: 128m
   fastapi:
-    build:
-      context: .
-      target: builder
+    image: shubhtistic/vortex:v1.0.0
+    pull_policy: always
     command:
       - uvicorn
       - src.vortex.main:app
@@ -77,11 +73,6 @@ services:
       nofile:
         soft: 65536
         hard: 65536
-    volumes:
-      - ./src:/vortex/src
-      - ./alembic:/vortex/alembic
-      - ./alembic.ini:/vortex/alembic.ini
-      - /vortex/.venv
     depends_on:
       migrate:
         condition: service_completed_successfully  # migrations must finish before api starts
@@ -93,7 +84,7 @@ services:
 
   # Nginx is the public HTTP entry point; FastAPI stays on the Compose network.
   nginx:
-    image: nginx:1.27.5
+    image: nginx:1.30.6
     restart: unless-stopped
     ports:
       - "8000:80"
@@ -111,9 +102,8 @@ services:
 
   # Redpanda consumer persists event batches to Postgres.
   event-processor:
-    build:
-      context: .
-      target: builder
+    image: shubhtistic/vortex:v1.0.0
+    pull_policy: always
     command: ["python", "-m", "src.vortex.event_processor"]
     restart: unless-stopped
     scale: 2
@@ -126,11 +116,6 @@ services:
         hard: 65536
     env_file:
       - .env
-    volumes:
-      - ./src:/vortex/src
-      - ./alembic:/vortex/alembic
-      - ./alembic.ini:/vortex/alembic.ini
-      - /vortex/.venv
     depends_on:
       migrate:
         condition: service_completed_successfully

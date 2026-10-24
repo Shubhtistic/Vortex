@@ -38,9 +38,7 @@ def _as_datetime(value: str | datetime | None) -> datetime:
 
 class PersonDistinctIdService:
     @staticmethod
-    async def get_many(
-        identities: set[tuple[UUID, str]], session: AsyncSession
-    ):
+    async def get_many(identities: set[tuple[UUID, str]], session: AsyncSession):
         return await PersonDistinctIdRepository.get_many(identities, session)
 
     @staticmethod
@@ -119,6 +117,25 @@ def _valid_identify_indexes(events: list[dict[str, Any]]) -> set[int]:
                     "Skipping ambiguous $identify event at batch index %d", index
                 )
     return valid
+
+
+def invalid_identify_indexes(
+    records: list[tuple[dict[str, Any], dict[str, Any]]],
+) -> set[int]:
+    """Return identify records that cannot be safely applied from this batch."""
+    events = []
+    for payload, _ in records:
+        event = dict(payload)
+        event["event_name"] = event.get("event", event.get("event_name"))
+        event["tenant_id"] = _as_uuid(event["tenant_id"])
+        events.append(event)
+
+    valid = _valid_identify_indexes(events)
+    return {
+        index
+        for index, event in enumerate(events)
+        if event.get("event_name") == IDENTIFY_EVENT_NAME and index not in valid
+    }
 
 
 class PersonService:

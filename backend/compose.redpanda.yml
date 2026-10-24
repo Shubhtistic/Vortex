@@ -9,7 +9,7 @@
 #        docker network create my-redpanda-net
 #   2. Start Redpanda:
 #        docker compose -p redpanda-local -f compose.redpanda.yml up -d
-#      Redpanda creates REDPANDA_EVENTS_TOPIC with
+#      Redpanda creates REDPANDA_EVENTS_TOPIC and REDPANDA_DLQ_TOPIC with
 #      REDPANDA_EVENTS_PARTITIONS (default: 12) during startup.
 #   3. Check that Redpanda is healthy and the topic exists:
 #        docker compose -p redpanda-local -f compose.redpanda.yml ps
@@ -43,9 +43,9 @@
 #   --advertise-rpc-addr (redpanda:33145), or clients will fail
 #   to reconnect after the first connection.
 #
-# The Redpanda service creates REDPANDA_EVENTS_TOPIC with the configured
-# partition count. Existing topics are not resized when that value changes;
-# update an existing topic explicitly if you change the count.
+# The Redpanda service creates both configured topics with the same partition
+# count. Existing topics are not resized when that value changes; update each
+# existing topic explicitly if you change the count.
 #
 # To wipe all Redpanda data and start clean:
 #        docker compose -p redpanda-local -f compose.redpanda.yml down -v
@@ -60,6 +60,7 @@ services:
     restart: on-failure:3
     environment:
       REDPANDA_EVENTS_TOPIC: ${REDPANDA_EVENTS_TOPIC:-vortex.events}
+      REDPANDA_DLQ_TOPIC: ${REDPANDA_DLQ_TOPIC:-vortex.events.dlq}
       REDPANDA_EVENTS_PARTITIONS: ${REDPANDA_EVENTS_PARTITIONS:-12}
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -93,6 +94,11 @@ services:
         done
 
         rpk topic create "$$REDPANDA_EVENTS_TOPIC" \
+          --partitions "$$REDPANDA_EVENTS_PARTITIONS" \
+          --if-not-exists \
+          -X brokers=127.0.0.1:19092
+
+        rpk topic create "$$REDPANDA_DLQ_TOPIC" \
           --partitions "$$REDPANDA_EVENTS_PARTITIONS" \
           --if-not-exists \
           -X brokers=127.0.0.1:19092

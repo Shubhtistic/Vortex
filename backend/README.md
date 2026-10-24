@@ -214,4 +214,11 @@ Do not commit `.env` files or production credentials.
 
 Database schema changes are managed by Alembic under `alembic/versions/`. The Compose `migrate` service runs `alembic upgrade head` before the API and event processor start.
 
-**Testing status: Pending.** Test commands and results will be documented after the backend test workflow has been established and run.
+### Local event-ingestion load test
+
+| Run | Events | Rate | HTTP (failed) | Checks passed | Latency avg / median / p95 (ms) |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 5 min, high volume | 3,000,500 | ~9.7k/s | 6,041 (0) | 6,001/6,001 | 29.81 / 30.84 / 56.62 |
+
+I ran this k6 test locally against `http://localhost:8000`, targeting 20 requests per second with 500 events in each request.
+**NOTE:** These results are from local testing only. After deployment, we will run the test again and add the deployed results here.

@@ -234,6 +234,11 @@ class RedpandaSettings(CommonSettings):
         validation_alias="REDPANDA_EVENTS_TOPIC",
     )
 
+    dlq_topic: str = Field(
+        default="vortex.events.dlq",
+        validation_alias="REDPANDA_DLQ_TOPIC",
+    )
+
     consumer_group_id: str = Field(
         validation_alias="REDPANDA_CONSUMER_GROUP_ID",
     )

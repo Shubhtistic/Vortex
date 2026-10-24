@@ -4,3 +4,7 @@ class RedpandaNotStartedError(RuntimeError):
 
 class RedpandaPublishError(RuntimeError):
     """Raised when a Redpanda message cannot be serialized or published."""
+
+
+class InvalidEventError(Exception):
+    """Raised when an event cannot be fixed by retrying it."""
