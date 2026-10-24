@@ -1,13 +1,6 @@
 "use client"
 
-import dynamic from "next/dynamic"
-
-const WorldMap = dynamic(() => import("@/components/ui/world-map"), {
-  ssr: false,
-  loading: () => (
-    <div aria-hidden="true" className="aspect-[2/1] w-full rounded-lg bg-black" />
-  ),
-})
+import WorldMap from "@/components/ui/world-map"
 
 export default function WorldMapDemo() {
   return (
