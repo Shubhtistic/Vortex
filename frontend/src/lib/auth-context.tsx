@@ -1,9 +1,9 @@
 "use client"
 
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react"
-import { userApi } from "@/services/api.services"
+import { authApi, orgApi, userApi } from "@/services/api.services"
 import type { User } from "@/services/api.types"
-import api, { setAccessToken } from "./api"
+import { setAccessToken } from "./api"
 import { isValidJwtFormat, sanitizeLoginPayload, sanitizeSignupPayload } from "./validation"
 
 interface AuthContextType {
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (org_slug: string, email: string, password: string) => {
       const sanitized = sanitizeLoginPayload({ org_slug, email, password })
-      const res = await api.post("/auth/login", sanitized)
+      const res = await authApi.login(sanitized.org_slug, sanitized.email, sanitized.password)
       const token = res.data?.data?.access_token
       if (token && isValidJwtFormat(token)) {
         setAccessToken(token)
@@ -77,13 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       last_name: string
     }) => {
       const sanitized = sanitizeSignupPayload(payload)
-      await api.post("/organizations/signup", sanitized)
+      await orgApi.signup(sanitized)
     },
     []
   )
 
   const logout = useCallback(async () => {
-    await api.post("/auth/logout")
+    await authApi.logout()
     setAccessToken(null)
     setAccessTokenState(null)
     setUser(null)

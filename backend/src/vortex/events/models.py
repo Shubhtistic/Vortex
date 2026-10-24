@@ -15,18 +15,18 @@ class Event(SQLModel, table=True):
     # no fk because we will later shift this table to clickhouse
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
-    organization_id: UUID = Field(index=True, nullable=False)
-    tenant_id: UUID = Field(index=True, nullable=False)
-    api_key_id: UUID = Field(index=True, nullable=False)
+    organization_id: UUID = Field(nullable=False)
+    tenant_id: UUID = Field(nullable=False)
+    api_key_id: UUID = Field(nullable=False)
 
-    distinct_id: str = Field(index=True)
+    distinct_id: str
     person_id: Optional[UUID] = Field(default=None, index=True)
 
-    session_id: Optional[UUID] = Field(default=None, index=True)
+    session_id: Optional[UUID] = Field(default=None)
 
-    group_id: Optional[UUID] = Field(default=None, index=True)
+    group_id: Optional[UUID] = Field(default=None)
 
-    event_name: str = Field(index=True)
+    event_name: str
 
     properties: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
 
@@ -42,7 +42,7 @@ class Event(SQLModel, table=True):
     insert_id: Optional[str] = Field(default=None, max_length=200)
 
     occurred_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=False, index=True)
+        sa_column=Column(DateTime(timezone=True), nullable=False)
     )
     received_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -52,7 +52,7 @@ class Event(SQLModel, table=True):
     ip_address: Optional[str] = Field(default=None, sa_column=Column(INET))
     user_agent: Optional[str] = Field(default=None, max_length=500)
 
-    source: EventSource = Field(default=EventSource.api, index=True)
+    source: EventSource = Field(default=EventSource.api)
     lib_version: Optional[str] = Field(default=None, max_length=50)
 
     created_at: datetime = Field(
@@ -63,7 +63,7 @@ class Event(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("tenant_id", "insert_id", name="uq_event_tenant_insert_id"),
         Index("ix_events_tenant_occurred_at", "tenant_id", "occurred_at"),
-        Index("ix_events_tenant_distinct_id", "tenant_id", "distinct_id"),
+        Index("ix_events_org_occurred_at", "organization_id", "occurred_at"),
     )
 
 
@@ -77,7 +77,7 @@ class Person(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid7, primary_key=True)
 
     tenant_id: UUID = Field(
-        sa_column=Column(ForeignKey("tenants.id"), index=True, nullable=False)
+        sa_column=Column(ForeignKey("tenants.id"), nullable=False)
     )
 
     properties: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
@@ -100,12 +100,12 @@ class PersonDistinctId(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
     tenant_id: UUID = Field(
-        sa_column=Column(ForeignKey("tenants.id"), index=True, nullable=False)
+        sa_column=Column(ForeignKey("tenants.id"), nullable=False)
     )
     person_id: UUID = Field(
         sa_column=Column(ForeignKey("persons.id"), index=True, nullable=False)
     )
-    distinct_id: str = Field(index=True)
+    distinct_id: str
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -123,10 +123,10 @@ class Group(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
     tenant_id: UUID = Field(
-        sa_column=Column(ForeignKey("tenants.id"), index=True, nullable=False)
+        sa_column=Column(ForeignKey("tenants.id"), nullable=False)
     )
 
-    group_key: str = Field(index=True)
+    group_key: str
 
     properties: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
 
@@ -154,10 +154,10 @@ class PersonGroup(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
     person_id: UUID = Field(
-        sa_column=Column(ForeignKey("persons.id"), index=True, nullable=False)
+        sa_column=Column(ForeignKey("persons.id"), nullable=False)
     )
     group_id: UUID = Field(
-        sa_column=Column(ForeignKey("groups.id"), index=True, nullable=False)
+        sa_column=Column(ForeignKey("groups.id"), nullable=False)
     )
 
     created_at: datetime = Field(

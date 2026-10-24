@@ -193,6 +193,10 @@ class RedpandaSettings(CommonSettings):
         validation_alias="REDPANDA_EVENTS_TOPIC",
     )
 
+    consumer_group_id: str = Field(
+        validation_alias="REDPANDA_CONSUMER_GROUP_ID",
+    )
+
     start_max_attempts: int = Field(
         default=5,
         validation_alias="REDPANDA_START_MAX_ATTEMPTS",
@@ -217,6 +221,7 @@ class RedpandaSettings(CommonSettings):
         default=None,
         validation_alias="REDPANDA_SASL_PASSWORD",
     )
+
 
 # --- Main Settings ---
 class Settings(CommonSettings):

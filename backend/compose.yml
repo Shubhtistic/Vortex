@@ -10,6 +10,9 @@ services:
       - vortex_pg_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    cpus: "5.0"
+    mem_limit: 10g
+    mem_reservation: 8g
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -20,6 +23,9 @@ services:
     build: .
     env_file: .env
     command: alembic upgrade head # closes the container after this as pid 1 gets completed
+    cpus: "0.6"
+    mem_limit: 640m
+    mem_reservation: 512m
     depends_on:
       postgres:
         condition: service_healthy 
@@ -29,6 +35,9 @@ services:
     image: redis:7-bookworm
     ports:
       - "6380:6379"
+    cpus: "0.6"
+    mem_limit: 640m
+    mem_reservation: 512m
     # deploy:
     #   resources:
     #     reservations:
@@ -44,6 +53,9 @@ services:
     command: ["uvicorn", "src.vortex.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "8000:8000"
+    cpus: "2.5"
+    mem_limit: 2560m
+    mem_reservation: 2g
     env_file:
       - .env
     environment:
@@ -67,11 +79,37 @@ services:
         condition: service_started 
     networks:
       - default
-      - redpanda-net
+      - my-redpanda-net
+
+  # Redpanda consumer persists event batches to Postgres.
+  event-processor:
+    build:
+      context: .
+      target: builder
+    command: ["python", "-m", "src.vortex.event_processor"]
+    restart: unless-stopped
+    cpus: "2.5"
+    mem_limit: 2560m
+    mem_reservation: 2g
+    env_file:
+      - .env
+    environment:
+      REDPANDA_BOOTSTRAP_SERVERS: redpanda:19092
+    volumes:
+      - ./src:/vortex/src
+      - ./alembic:/vortex/alembic
+      - ./alembic.ini:/vortex/alembic.ini
+      - /vortex/.venv
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - default
+      - my-redpanda-net
 
 volumes:
   vortex_pg_data:
 
 networks:
-  redpanda-net:
+  my-redpanda-net:
     external: true

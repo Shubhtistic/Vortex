@@ -5,7 +5,7 @@ description = "Add your description here"
 authors = [
     { name = "Shubhtistic", email = "theshubham1412@gmail.com" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.19.1",
     "argon2-cffi>=25.1.0",

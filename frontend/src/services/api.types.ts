@@ -134,14 +134,4 @@ export type TenantErrorMessage =
   | "The key is already revoked or is in grace period" // 409
   | "The key slug is already taken" // 409
 
-// tenants/dependencies.py (API key auth for event ingestion)
-export type ApiKeyAuthMessage =
-  | "Missing API key" // 401 — no X-API-Key header
-  | "Invalid API key" // 401 — bad key
-  | "API key revoked" // 401 — revoked or expired grace
-  | "Api key is revoked" // 401 — from cache
-  | "We Are Currently Facing Some issues" // 503 — DB Redis failure
-
-// events/router.py — NO PUBLIC ROUTES YET (empty file)
-// Event ingestion endpoints are not yet exposed as FastAPI routes.
-// Models: Event, Person, PersonDistinctId, Group, PersonGroup exist but no router.
+// Event ingestion is intentionally outside the website dashboard API client.

@@ -254,6 +254,13 @@ export default function SignupPage() {
             Sign in
           </Link>
         </p>
+        <p className="mt-4 text-center text-xs text-white/35 font-dm">
+          By creating an account, you agree to our{" "}
+          <Link href="/terms" className="text-brand/80 hover:text-brand transition-colors">
+            Terms and Conditions
+          </Link>
+          .
+        </p>
       </div>
     </div>
   )

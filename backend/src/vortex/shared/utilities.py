@@ -8,5 +8,3 @@ def reject_blank_text(value: Any) -> Any:
     if not value.strip():
         raise ValueError("must not be empty or contain only whitespace")
     return value
-
-

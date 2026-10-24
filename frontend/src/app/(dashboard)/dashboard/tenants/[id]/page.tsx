@@ -32,11 +32,11 @@ export default function TenantDetailPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [tenantRes, keysRes] = await Promise.all([
-          tenantApi.get(tenantId),
+        const [tenantData, keysRes] = await Promise.all([
+          tenantApi.findById(tenantId),
           apiKeyApi.list(tenantId, { limit: 50 }),
         ])
-        if (tenantRes?.data?.data) setTenant(tenantRes.data.data)
+        setTenant(tenantData)
         if (keysRes?.data?.data) setKeys(keysRes.data.data)
       } catch (err) {
         const msg =

@@ -57,20 +57,20 @@ export const tenantApi = {
 
   create: (payload: CreateTenantPayload) => api.post<{ data: Tenant }>("/tenants", payload),
 
-  // PENDING API: GET /tenants/{tenant_id} - Backend not implemented yet. Static handler. Will be mapped to real API when implemented.
-  get: (_id: string) => {
-    const data: Tenant = {
-      id: _id,
-      tenant_name: "Sample Tenant",
-      slug: "sample-tenant",
-      created_at: new Date().toISOString(),
-      status: "active",
-    }
-    return Promise.resolve({ data } as unknown as { data: { data: Tenant } })
-  },
+  findById: async (tenantId: string): Promise<Tenant | null> => {
+    const firstPage = await tenantApi.list({ limit: 50, page_num: 1 })
+    const firstPageTenant = firstPage.data.data?.find((tenant) => tenant.id === tenantId)
+    if (firstPageTenant) return firstPageTenant
 
-  // PENDING API: PATCH /tenants/{tenant_id} - Backend not implemented yet. Static handler. Will be mapped to real API when implemented.
-  update: (_id: string, _payload: Partial<CreateTenantPayload>) => Promise.resolve({ data: null }),
+    const totalPages = firstPage.data.meta?.total_pages ?? 1
+    for (let pageNum = 2; pageNum <= totalPages; pageNum += 1) {
+      const page = await tenantApi.list({ limit: 50, page_num: pageNum })
+      const tenant = page.data.data?.find((item) => item.id === tenantId)
+      if (tenant) return tenant
+    }
+
+    return null
+  },
 }
 
 // ── ApiKey ──

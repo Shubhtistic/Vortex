@@ -1,128 +1,139 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import DashboardShell from "@/components/dashboard/DashboardShell"
-import Button from "@/components/ui/Button"
 import Card from "@/components/ui/Card"
-import Input from "@/components/ui/Input"
 import { orgApi, userApi } from "@/services/api.services"
 import type { Organization, User } from "@/services/api.types"
-
-// PENDING API: PATCH /organizations/me - Backend not implemented yet. Static handler. Will be mapped to real API when implemented.
-// PENDING API: PATCH /organizations/members/{user_id} - Backend not implemented yet. Static handler. Will be mapped to real API when implemented.
 
 export default function SettingsPage() {
   const [org, setOrg] = useState<Organization | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [saveMessage, setSaveMessage] = useState("")
+  const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const [orgRes, userRes] = await Promise.all([orgApi.getMe(), userApi.getMe()])
-        if (orgRes?.data?.data) setOrg(orgRes.data.data)
-        if (userRes?.data?.data) {
-          setUser(userRes.data.data)
-          setFirstName(userRes.data.data.first_name)
-          setLastName(userRes.data.data.last_name)
+        const organization = orgRes?.data?.data ?? null
+        const account = userRes?.data?.data ?? null
+
+        setOrg(organization)
+        setUser(account)
+        if (!organization || !account) {
+          setLoadError("Some account details could not be loaded. Try refreshing the page.")
         }
       } catch {
-        /* silent fail */
+        setLoadError("Account details could not be loaded. Try refreshing the page.")
       } finally {
         setLoading(false)
       }
     }
-    loadData()
-  }, [])
 
-  // PENDING API: PATCH /organizations/me - Backend not implemented yet. Static handler. Will be mapped to real API when implemented.
-  const handleSave = async () => {
-    setSaveMessage("")
-    setSaving(true)
-    try {
-      // PENDING API: PATCH /organizations/me - Backend not implemented yet. Static handler. Will be mapped to real API when implemented.
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setSaveMessage("Profile updated (static handler — awaiting backend)")
-    } catch {
-      setSaveMessage("Failed to update profile")
-    } finally {
-      setSaving(false)
-    }
-  }
+    void loadData()
+  }, [])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <span className="font-dm text-white/60 text-sm tracking-widest uppercase">Loading...</span>
-      </div>
+      <DashboardShell title="Settings" subtitle="Your account and organization details">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <p className="font-dm text-sm text-white/50">Loading account details...</p>
+        </div>
+      </DashboardShell>
     )
   }
 
+  const initials = `${user?.first_name?.[0] ?? ""}${user?.last_name?.[0] ?? ""}` || "V"
+
   return (
-    <DashboardShell title="Settings" showDock={false}>
-      <div className="max-w-lg space-y-8">
-        <Card title="Organization" subtitle={org?.slug ? `@${org.slug}` : undefined}>
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-white/40 font-dm text-xs uppercase tracking-widest mb-1">Name</p>
-              <p className="font-dm text-white/70">{org?.name ?? "—"}</p>
-            </div>
-            <div>
-              <p className="text-white/40 font-dm text-xs uppercase tracking-widest mb-1">ID</p>
-              <p className="font-dm text-white/70 break-all">{org?.id ?? "—"}</p>
-            </div>
+    <DashboardShell title="Settings" subtitle="Your account and organization details">
+      <div className="max-w-5xl space-y-6">
+        {loadError && (
+          <div
+            role="status"
+            className="rounded-lg border border-[var(--color-accent3)]/25 bg-[var(--color-accent3)]/10 px-4 py-3 font-dm text-sm text-[var(--color-accent3)]"
+          >
+            {loadError}
           </div>
-        </Card>
+        )}
 
-        <Card title="Profile" subtitle="Update your personal information">
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="First name"
-                value={firstName}
-                onChange={setFirstName}
-                placeholder="Jane"
-              />
-              <Input label="Last name" value={lastName} onChange={setLastName} placeholder="Doe" />
-            </div>
-            {user && (
-              <div>
-                <p className="text-white/40 font-dm text-xs uppercase tracking-widest mb-1">
-                  Email
-                </p>
-                <p className="font-dm text-white/70">{user.email}</p>
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <Card title="Personal account" subtitle="Your signed-in user profile">
+            <div className="flex items-center gap-4 border-b border-[var(--color-border)] pb-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-brand/30 bg-brand/10 font-syne text-sm font-bold text-brand">
+                {initials}
               </div>
-            )}
-            {saveMessage && (
-              <p
-                className={`text-sm font-dm ${saveMessage.includes("updated") ? "text-[var(--color-accent2)]" : "text-[var(--color-red)]"}`}
-              >
-                {saveMessage}
-              </p>
-            )}
-            <Button onClick={handleSave} disabled={saving} size="sm">
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        </Card>
+              <div className="min-w-0">
+                <p className="truncate font-syne text-base font-semibold text-white">
+                  {user ? `${user.first_name} ${user.last_name}` : "Account unavailable"}
+                </p>
+                <p className="truncate font-dm text-sm text-white/45">{user?.email ?? "—"}</p>
+              </div>
+            </div>
 
-        <Card title="API Keys" subtitle="Manage your organization's API keys">
-          <div className="text-center py-6">
-            <p className="text-white/30 font-dm text-sm">
-              Go to{" "}
-              <a
+            <dl className="mt-5 grid gap-5 sm:grid-cols-2">
+              <div>
+                <dt className="mb-1 font-dm text-[11px] uppercase tracking-widest text-white/40">
+                  First name
+                </dt>
+                <dd className="font-dm text-sm text-white/75">{user?.first_name ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="mb-1 font-dm text-[11px] uppercase tracking-widest text-white/40">
+                  Last name
+                </dt>
+                <dd className="font-dm text-sm text-white/75">{user?.last_name ?? "—"}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="mb-1 font-dm text-[11px] uppercase tracking-widest text-white/40">
+                  User ID
+                </dt>
+                <dd className="break-all font-dm text-xs text-white/55">{user?.id ?? "—"}</dd>
+              </div>
+            </dl>
+          </Card>
+
+          <div className="space-y-6">
+            <Card title="Organization" subtitle={org?.slug ? `@${org.slug}` : "Workspace details"}>
+              <dl className="space-y-5">
+                <div>
+                  <dt className="mb-1 font-dm text-[11px] uppercase tracking-widest text-white/40">
+                    Name
+                  </dt>
+                  <dd className="font-syne text-sm font-medium text-white/80">
+                    {org?.name ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="mb-1 font-dm text-[11px] uppercase tracking-widest text-white/40">
+                    Organization ID
+                  </dt>
+                  <dd className="break-all font-dm text-xs text-white/55">{org?.id ?? "—"}</dd>
+                </div>
+              </dl>
+            </Card>
+
+            <Card title="API keys" subtitle="Create and manage tenant keys">
+              <p className="mb-4 font-dm text-sm leading-6 text-white/50">
+                API keys are managed from each tenant. Open the tenant list to view its keys.
+              </p>
+              <Link
                 href="/dashboard/tenants"
-                className="text-brand hover:text-brand-dark transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/10 px-4 py-2 font-dm text-xs font-medium text-brand transition-colors hover:bg-brand/15"
               >
-                Tenants
-              </a>{" "}
-              to manage API keys
-            </p>
+                Go to tenants <span aria-hidden="true">→</span>
+              </Link>
+            </Card>
           </div>
+        </div>
+
+        <Card title="Profile changes" subtitle="Editing profile details is not available yet">
+          <p className="font-dm text-sm leading-6 text-white/50">
+            Your account details are shown here for reference. Profile editing is not available from
+            this screen yet.
+          </p>
         </Card>
       </div>
     </DashboardShell>

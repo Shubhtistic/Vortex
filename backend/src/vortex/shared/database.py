@@ -65,10 +65,9 @@ async def create(
     instance: Model,
     db_session: AsyncSession,
 ) -> Model:
-    """Insert a new row. Flushes only — caller's transaction boundary commits."""
+    """Insert a new row and flush it; the caller's transaction boundary commits."""
     db_session.add(instance)
     await db_session.flush()
-    await db_session.refresh(instance)
     return instance
 
 

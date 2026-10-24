@@ -12,3 +12,10 @@ docs/.docusaurus/
 
 # --- Internal reference only, never commit ---
 api_mapped.md
+
+ARCHITECTURE.md
+DECISIONS.md
+CONTEXT.md
+
+# Internal backend files; keep local and out of GitHub.
+backend/internal/

@@ -153,6 +153,13 @@ export default function LoginPage() {
             Sign up
           </Link>
         </p>
+        <p className="mt-4 text-center text-xs text-white/35 font-dm">
+          By using Vortex, you agree to our{" "}
+          <Link href="/terms" className="text-brand/80 hover:text-brand transition-colors">
+            Terms and Conditions
+          </Link>
+          .
+        </p>
       </div>
     </div>
   )

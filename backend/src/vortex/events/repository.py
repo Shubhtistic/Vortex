@@ -1,0 +1,261 @@
+from datetime import datetime, timezone
+from typing import Any
+from uuid import UUID, uuid7
+
+from sqlalchemy import case, delete, select, tuple_, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.vortex.shared.database import execute_query
+
+from .consts import EVENTS_INSERT_CHUNK_SIZE
+from .models import Event, Group, Person, PersonDistinctId, PersonGroup
+
+
+class EventRepository:
+    @staticmethod
+    async def insert_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
+        if not rows:
+            return
+
+        # Drop duplicates in this batch before PostgreSQL checks the same unique key.
+        unique_rows = []
+        seen_insert_ids: set[tuple[UUID, str]] = set()
+        for row in rows:
+            insert_id = row.get("insert_id")
+            if insert_id is not None:
+                unique_key = (row["tenant_id"], insert_id)
+                if unique_key in seen_insert_ids:
+                    continue
+                seen_insert_ids.add(unique_key)
+            unique_rows.append(row)
+
+        # Keep each statement below PostgreSQL's bind-parameter limit.
+        for start in range(0, len(unique_rows), EVENTS_INSERT_CHUNK_SIZE):
+            batch = unique_rows[start : start + EVENTS_INSERT_CHUNK_SIZE]
+            stmt = (
+                pg_insert(Event)
+                .values(batch)
+                .on_conflict_do_nothing(index_elements=["tenant_id", "insert_id"])
+            )
+            await execute_query(query=stmt, db_session=session)
+
+    @staticmethod
+    async def reassign_person(
+        source_id: UUID, target_id: UUID, session: AsyncSession
+    ) -> None:
+        await EventRepository.reassign_people({source_id: target_id}, session)
+
+    @staticmethod
+    async def reassign_people(
+        person_merges: dict[UUID, UUID], session: AsyncSession
+    ) -> None:
+        person_merges = {
+            source_id: target_id
+            for source_id, target_id in person_merges.items()
+            if source_id != target_id
+        }
+        if not person_merges:
+            return
+        stmt = (
+            update(Event)
+            .where(Event.person_id.in_(person_merges))
+            .values(person_id=case(person_merges, value=Event.person_id))
+        )
+        await execute_query(query=stmt, db_session=session)
+
+
+class PersonRepository:
+    @staticmethod
+    async def get_many(
+        person_ids: set[UUID], session: AsyncSession
+    ) -> dict[UUID, Person]:
+        if not person_ids:
+            return {}
+        stmt = (
+            select(Person)
+            .where(Person.id.in_(person_ids))
+            .execution_options(populate_existing=True)
+        )
+        result = await execute_query(query=stmt, db_session=session)
+        return {person.id: person for person in result.scalars()}
+
+    @staticmethod
+    async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
+        if rows:
+            stmt = pg_insert(Person).values(rows).on_conflict_do_nothing()
+            await execute_query(query=stmt, db_session=session)
+
+    @staticmethod
+    async def merge_profiles(
+        updates: dict[UUID, dict[str, Any]], session: AsyncSession
+    ) -> None:
+        if not updates:
+            return
+        stmt = (
+            update(Person)
+            .where(Person.id.in_(updates))
+            .values(
+                properties=case(updates, value=Person.id, else_=Person.properties),
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+        await execute_query(query=stmt, db_session=session)
+
+    @staticmethod
+    async def delete_many(person_ids: set[UUID], session: AsyncSession) -> None:
+        if person_ids:
+            stmt = delete(Person).where(Person.id.in_(person_ids))
+            await execute_query(query=stmt, db_session=session)
+
+
+class PersonDistinctIdRepository:
+    @staticmethod
+    async def get_many(
+        identities: set[tuple[UUID, str]], session: AsyncSession
+    ) -> dict[tuple[UUID, str], UUID]:
+        if not identities:
+            return {}
+        stmt = select(
+            PersonDistinctId.tenant_id,
+            PersonDistinctId.distinct_id,
+            PersonDistinctId.person_id,
+        ).where(
+            tuple_(PersonDistinctId.tenant_id, PersonDistinctId.distinct_id).in_(
+                identities
+            )
+        )
+        result = await execute_query(query=stmt, db_session=session)
+        return {(row.tenant_id, row.distinct_id): row.person_id for row in result}
+
+    @staticmethod
+    async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
+        for start in range(0, len(rows), 5000):
+            stmt = (
+                pg_insert(PersonDistinctId)
+                .values(rows[start : start + 5000])
+                .on_conflict_do_nothing(index_elements=["tenant_id", "distinct_id"])
+            )
+            await execute_query(query=stmt, db_session=session)
+
+    @staticmethod
+    async def reassign_person(
+        source_id: UUID, target_id: UUID, session: AsyncSession
+    ) -> None:
+        await PersonDistinctIdRepository.reassign_people(
+            {source_id: target_id}, session
+        )
+
+    @staticmethod
+    async def reassign_people(
+        person_merges: dict[UUID, UUID], session: AsyncSession
+    ) -> None:
+        person_merges = {
+            source_id: target_id
+            for source_id, target_id in person_merges.items()
+            if source_id != target_id
+        }
+        if not person_merges:
+            return
+        stmt = (
+            update(PersonDistinctId)
+            .where(PersonDistinctId.person_id.in_(person_merges))
+            .values(person_id=case(person_merges, value=PersonDistinctId.person_id))
+        )
+        await execute_query(query=stmt, db_session=session)
+
+
+class GroupRepository:
+    @staticmethod
+    async def get_many(
+        identities: set[tuple[UUID, str]], session: AsyncSession
+    ) -> dict[tuple[UUID, str], Group]:
+        if not identities:
+            return {}
+        stmt = select(Group).where(
+            tuple_(Group.tenant_id, Group.group_key).in_(identities)
+        )
+        result = await execute_query(query=stmt, db_session=session)
+        return {(group.tenant_id, group.group_key): group for group in result.scalars()}
+
+    @staticmethod
+    async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
+        for start in range(0, len(rows), 5000):
+            stmt = (
+                pg_insert(Group)
+                .values(rows[start : start + 5000])
+                .on_conflict_do_nothing(index_elements=["tenant_id", "group_key"])
+            )
+            await execute_query(query=stmt, db_session=session)
+
+    @staticmethod
+    async def merge_properties(
+        updates: dict[UUID, dict[str, Any]], session: AsyncSession
+    ) -> None:
+        if not updates:
+            return
+        stmt = (
+            update(Group)
+            .where(Group.id.in_(updates))
+            .values(
+                properties=case(updates, value=Group.id, else_=Group.properties),
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+        await execute_query(query=stmt, db_session=session)
+
+
+class PersonGroupRepository:
+    @staticmethod
+    async def add_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
+        unique_rows: dict[tuple[UUID, UUID], dict[str, Any]] = {}
+        for row in rows:
+            unique_rows.setdefault((row["person_id"], row["group_id"]), row)
+        rows = list(unique_rows.values())
+        for start in range(0, len(rows), 5000):
+            stmt = (
+                pg_insert(PersonGroup)
+                .values(rows[start : start + 5000])
+                .on_conflict_do_nothing(index_elements=["person_id", "group_id"])
+            )
+            await execute_query(query=stmt, db_session=session)
+
+    @staticmethod
+    async def move_person_links(
+        source_id: UUID, target_id: UUID, session: AsyncSession
+    ) -> None:
+        await PersonGroupRepository.move_person_links_many(
+            {source_id: target_id}, session
+        )
+
+    @staticmethod
+    async def move_person_links_many(
+        person_merges: dict[UUID, UUID], session: AsyncSession
+    ) -> None:
+        person_merges = {
+            source_id: target_id
+            for source_id, target_id in person_merges.items()
+            if source_id != target_id
+        }
+        if not person_merges:
+            return
+        stmt = select(PersonGroup.person_id, PersonGroup.group_id).where(
+            PersonGroup.person_id.in_(person_merges)
+        )
+        links = await execute_query(query=stmt, db_session=session)
+        target_links = {
+            (person_merges[source_id], group_id)
+            for source_id, group_id in links
+        }
+        rows = [
+            {
+                "id": uuid7(),
+                "person_id": person_id,
+                "group_id": group_id,
+                "created_at": datetime.now(timezone.utc),
+            }
+            for person_id, group_id in target_links
+        ]
+        await PersonGroupRepository.add_many(rows, session)
+        stmt = delete(PersonGroup).where(PersonGroup.person_id.in_(person_merges))
+        await execute_query(query=stmt, db_session=session)

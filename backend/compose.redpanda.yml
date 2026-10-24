@@ -6,19 +6,20 @@
 #
 # First-time setup:
 #   1. Create the shared network once per machine:
-#        docker network create redpanda-net
+#        docker network create my-redpanda-net
 #   2. Start Redpanda:
 #        docker compose -p redpanda-local -f compose.redpanda.yml up -d
-#   3. Check it is healthy (wait until STATUS says "healthy"):
+#      New auto-created topics use REDPANDA_EVENTS_PARTITIONS (default: 12).
+#   3. Check that Redpanda is healthy:
 #        docker compose -p redpanda-local -f compose.redpanda.yml ps
 #   No .env file is needed. This setup is PLAINTEXT, for local development only.
 #
 # Use Redpanda from another Docker project:
 #   In that project's docker-compose.yml, add this to the service:
-#        networks: [default, redpanda-net]
+#        networks: [default, my-redpanda-net]
 #   Add this at the bottom of that file:
 #        networks:
-#          redpanda-net:
+#          my-redpanda-net:
 #            external: true
 #   Then add this to that project's .env:
 #        REDPANDA_BOOTSTRAP_SERVERS=redpanda:19092
@@ -30,7 +31,7 @@
 #        REDPANDA_BOOTSTRAP_SERVERS=localhost:9092
 #
 # Why two ports?
-#   19092 (INTERNAL) is for containers on redpanda-net, reached as redpanda:19092.
+#   19092 (INTERNAL) is for containers on my-redpanda-net, reached as redpanda:19092.
 #   9092  (EXTERNAL) is for your host machine, reached as localhost:9092.
 #   Redpanda tells every client which address to reconnect to (the advertised
 #   listener), so each kind of client needs its own address.
@@ -40,8 +41,9 @@
 #   --advertise-rpc-addr (redpanda:33145), or clients will fail
 #   to reconnect after the first connection.
 #
-# Topics are created automatically on first use, with Redpanda's configured
-# default partition count.
+# New topics auto-created by clients use REDPANDA_EVENTS_PARTITIONS. This is a
+# cluster default, so it applies to every newly auto-created topic, not just
+# REDPANDA_EVENTS_TOPIC. Existing topics are not resized when this value changes.
 #
 # To wipe all Redpanda data and start clean:
 #        docker compose -p redpanda-local -f compose.redpanda.yml down -v
@@ -68,23 +70,34 @@ services:
       - --mode
       - dev-container
       - --smp
-      - "1"
+      - "2"
       - --default-log-level=info
+    cpus: "2.5"
+    mem_limit: 5g
+    mem_reservation: 4g
     ports:
       - "9092:9092" # for your host machine (localhost:9092)
     volumes:
       - redpanda-data:/var/lib/redpanda/data
+    configs:
+      - source: redpanda-bootstrap
+        target: /etc/redpanda/.bootstrap.yaml
     healthcheck:
       test: ["CMD", "rpk", "cluster", "health"]
       interval: 10s
       timeout: 10s
       retries: 10
     networks:
-      - redpanda-net
+      - my-redpanda-net
 
 volumes:
   redpanda-data:
 
 networks:
-  redpanda-net:
+  my-redpanda-net:
     external: true
+
+configs:
+  redpanda-bootstrap:
+    content: |
+      default_topic_partitions: ${REDPANDA_EVENTS_PARTITIONS:-12}

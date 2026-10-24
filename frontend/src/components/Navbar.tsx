@@ -27,6 +27,12 @@ export default function Navbar() {
           </Link>
           <div className="flex items-center space-x-4">
             <Link
+              href="/terms"
+              className="text-white/50 transition-colors duration-200 hover:text-white"
+            >
+              Terms
+            </Link>
+            <Link
               href="/login"
               className="text-white/80 hover:text-white transition-colors duration-200"
             >
