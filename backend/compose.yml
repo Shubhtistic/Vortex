@@ -46,6 +46,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      REDPANDA_BOOTSTRAP_SERVERS: redpanda:19092
     volumes:
       - ./src:/vortex/src
       - ./alembic:/vortex/alembic
@@ -63,6 +65,13 @@ services:
         condition: service_completed_successfully  # migrations must finish before api starts
       redis:
         condition: service_started 
+    networks:
+      - default
+      - redpanda-net
 
 volumes:
   vortex_pg_data:
+
+networks:
+  redpanda-net:
+    external: true

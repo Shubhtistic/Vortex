@@ -1,0 +1,90 @@
+# =====================================================================
+# Shared local Redpanda server (single-node development mode)
+# Use -p in the compose command so this runs as its own project, even if
+# it sits in the same folder as another compose file:
+#        docker compose -p redpanda-local -f compose.redpanda.yml up -d
+#
+# First-time setup:
+#   1. Create the shared network once per machine:
+#        docker network create redpanda-net
+#   2. Start Redpanda:
+#        docker compose -p redpanda-local -f compose.redpanda.yml up -d
+#   3. Check it is healthy (wait until STATUS says "healthy"):
+#        docker compose -p redpanda-local -f compose.redpanda.yml ps
+#   No .env file is needed. This setup is PLAINTEXT, for local development only.
+#
+# Use Redpanda from another Docker project:
+#   In that project's docker-compose.yml, add this to the service:
+#        networks: [default, redpanda-net]
+#   Add this at the bottom of that file:
+#        networks:
+#          redpanda-net:
+#            external: true
+#   Then add this to that project's .env:
+#        REDPANDA_BOOTSTRAP_SERVERS=redpanda:19092
+#   NOTE: "depends_on" cannot see a service from another compose project.
+#   Do not add "redpanda" to depends_on there. Start Redpanda first, and let
+#   the app retry its connection while the broker boots.
+#
+# Use Redpanda from your own machine (an app or a tool NOT running in Docker):
+#        REDPANDA_BOOTSTRAP_SERVERS=localhost:9092
+#
+# Why two ports?
+#   19092 (INTERNAL) is for containers on redpanda-net, reached as redpanda:19092.
+#   9092  (EXTERNAL) is for your host machine, reached as localhost:9092.
+#   Redpanda tells every client which address to reconnect to (the advertised
+#   listener), so each kind of client needs its own address.
+#
+# If you rename container_name or the service from "redpanda":
+#   also change --advertise-kafka-addr (INTERNAL://redpanda:19092) and
+#   --advertise-rpc-addr (redpanda:33145), or clients will fail
+#   to reconnect after the first connection.
+#
+# Topics are created automatically on first use, with Redpanda's configured
+# default partition count.
+#
+# To wipe all Redpanda data and start clean:
+#        docker compose -p redpanda-local -f compose.redpanda.yml down -v
+# =====================================================================
+
+name: redpanda-local
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.6
+    container_name: redpanda
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --kafka-addr
+      - internal://0.0.0.0:19092,external://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - internal://redpanda:19092,external://localhost:9092
+      - --rpc-addr
+      - redpanda:33145
+      - --advertise-rpc-addr
+      - redpanda:33145
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --default-log-level=info
+    ports:
+      - "9092:9092" # for your host machine (localhost:9092)
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - redpanda-net
+
+volumes:
+  redpanda-data:
+
+networks:
+  redpanda-net:
+    external: true

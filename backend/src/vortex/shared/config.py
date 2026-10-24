@@ -95,6 +95,10 @@ class RedisSettings(CommonSettings):
 # --- App settings ---
 class AppSettings(CommonSettings):
 
+    environment: str = Field(
+        validation_alias="ENVIRONMENT",
+    )
+
     project_name: str = Field(
         default="SonClarus",
         validation_alias="PROJECT_NAME",
@@ -156,6 +160,64 @@ class CORSSettings(CommonSettings):
     )
 
 
+# --- Redpanda ---
+class RedpandaSettings(CommonSettings):
+
+    bootstrap_servers: str = Field(
+        default="localhost:9092",
+        validation_alias="REDPANDA_BOOTSTRAP_SERVERS",
+    )
+
+    client_id: str = Field(
+        default="vortex",
+        validation_alias="REDPANDA_CLIENT_ID",
+    )
+
+    security_protocol: str = Field(
+        default="PLAINTEXT",
+        validation_alias="REDPANDA_SECURITY_PROTOCOL",
+    )
+
+    request_timeout_ms: int = Field(
+        default=40_000,
+        validation_alias="REDPANDA_REQUEST_TIMEOUT_MS",
+    )
+
+    max_batch_size: int = Field(
+        default=16_384,
+        validation_alias="REDPANDA_MAX_BATCH_SIZE",
+    )
+
+    events_topic: str = Field(
+        default="vortex.events",
+        validation_alias="REDPANDA_EVENTS_TOPIC",
+    )
+
+    start_max_attempts: int = Field(
+        default=5,
+        validation_alias="REDPANDA_START_MAX_ATTEMPTS",
+    )
+
+    send_timeout_seconds: float = Field(
+        default=10.0,
+        validation_alias="REDPANDA_SEND_TIMEOUT_SECONDS",
+    )
+
+    sasl_mechanism: str = Field(
+        default="PLAIN",
+        validation_alias="REDPANDA_SASL_MECHANISM",
+    )
+
+    sasl_username: Optional[str] = Field(
+        default=None,
+        validation_alias="REDPANDA_SASL_USERNAME",
+    )
+
+    sasl_password: Optional[str] = Field(
+        default=None,
+        validation_alias="REDPANDA_SASL_PASSWORD",
+    )
+
 # --- Main Settings ---
 class Settings(CommonSettings):
 
@@ -165,6 +227,7 @@ class Settings(CommonSettings):
     jwt: JwtSettings = Field(default_factory=JwtSettings)
     project: ProjectSettings = Field(default_factory=ProjectSettings)
     cors: CORSSettings = Field(default_factory=CORSSettings)
+    redpanda: RedpandaSettings = Field(default_factory=RedpandaSettings)
 
 
 @lru_cache

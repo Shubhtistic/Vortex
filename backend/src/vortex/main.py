@@ -3,14 +3,14 @@ import logging
 from fastapi.exceptions import RequestValidationError
 from scalar_fastapi import get_scalar_api_reference
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 
-from src.vortex.shared.logging_middleware import RequestLoggingMiddleware
+from src.vortex.shared.middleware import CORSMiddlewareWithSettings, log_requests
+from src.vortex.shared.redpanda_client import RedpandaProducer
 from src.vortex.shared.responses import ApiResponse
 from src.vortex.shared.redis_client import init_redis, close_redis
 from src.vortex.api.routers import router as api_router
-from src.vortex.shared.config import get_settings
 from src.vortex.shared.logging_config import setup_logging
+from src.vortex.shared.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +24,14 @@ async def lifespan(app: FastAPI):
     try:
         await init_redis()
         logger.info("Application startup completed")
+        await RedpandaProducer.start()
+
         yield
     except Exception:
         logger.exception("Application lifecycle failed")
         raise
     finally:
+        await RedpandaProducer.stop()
         await close_redis()
         logger.info("Application shutdown completed")
 
@@ -66,24 +69,17 @@ async def validation_handler(request: Request, exc: RequestValidationError):
 # ===== Add Middlewares ====
 
 # --- Cors Middleware Policy ---
-
-settings = get_settings()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors.allowed_origins,
-    allow_methods=settings.cors.allowed_methods,
-    allow_headers=settings.cors.allowed_headers,
-    allow_credentials=settings.cors.allow_credentials,
-    max_age=settings.cors.max_age,
-)
+app.add_middleware(CORSMiddlewareWithSettings)
 
 # --- logging midleware ---
-app.add_middleware(RequestLoggingMiddleware)
+if get_settings().app.environment.lower() != "live":
+
+    @app.middleware("http")
+    async def request_logging_middleware(request: Request, call_next):
+        return await log_requests(request, call_next)
 
 
 # --- imports routers ---
-
 app.include_router(api_router)
 
 
