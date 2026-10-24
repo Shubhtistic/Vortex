@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Query
 
 from src.vortex.shared.responses import ApiResponse
@@ -96,7 +98,7 @@ async def create_an_api_key(
 
 @router.get("/tenants/api-keys")
 async def get_all_api_keys(
-    tenant_id: str,
+    tenant_id: UUID,
     db_session: DbSessionDep,
     user_data: CurrentUserDep,
     limit: int = Query(10, ge=1, le=50, description="items per page"),
@@ -125,8 +127,8 @@ async def get_all_api_keys(
 
 @router.delete("/tenants/{tenant_id}/api-keys/{api_key_id}", status_code=204)
 async def revoke_api_key(
-    tenant_id: str,
-    api_key_id: str,
+    tenant_id: UUID,
+    api_key_id: UUID,
     db_session: DbSessionDep,
     user_data: VerifiedAdminDep,
 ):

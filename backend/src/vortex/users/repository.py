@@ -43,7 +43,7 @@ class UserRepository:
         return await get_all(stmt=q, db_session=db_session)
 
     @staticmethod
-    async def get_user_by_id(user_id: str, db_session: AsyncSession) -> Optional[User]:
+    async def get_user_by_id(user_id: UUID, db_session: AsyncSession) -> Optional[User]:
 
         qry = select(User).where(User.id == user_id, User.is_active == True)
 

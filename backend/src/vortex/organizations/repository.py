@@ -121,7 +121,7 @@ class MembershipRepository:
     @staticmethod
     async def deactivate_member(
         db_session: AsyncSession, org_id: UUID, user_id: UUID
-    ) -> UUID | str:
+    ) -> UUID | None:
         stmt = (
             update(OrganizationMembership)
             .where(

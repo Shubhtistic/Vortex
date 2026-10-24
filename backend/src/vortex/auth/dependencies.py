@@ -27,6 +27,15 @@ async def current_user_dep(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+    try:
+        claims["user_id"] = UUID(str(claims["user_id"]))
+        claims["org_id"] = UUID(str(claims["org_id"]))
+    except (KeyError, ValueError):
+        logger.warning("Bearer token claims malformed")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Malformed token claims",
+        )
     return claims
 
 
@@ -45,8 +54,8 @@ async def optional_current_user_dep(
 async def _get_verified_membership(current_user: dict, db_session: DbSessionDep):
     """Shared DB-verification step for tier 2 and tier 3 deps."""
     try:
-        user_id = UUID(current_user["user_id"])
-        org_id = UUID(current_user["org_id"])
+        user_id = current_user["user_id"]
+        org_id = current_user["org_id"]
     except (KeyError, ValueError):
         logger.warning("Bearer token claims malformed")
         raise HTTPException(

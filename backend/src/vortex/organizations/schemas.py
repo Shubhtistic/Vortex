@@ -33,8 +33,8 @@ class InviteMemberRequest(BaseModel):
 
 class MembershipRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    user_id: UUID | str
-    organization_id: UUID | str
+    user_id: UUID
+    organization_id: UUID
     role: MembershipRole
     created_at: datetime
 

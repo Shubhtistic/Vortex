@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import logging
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,8 +26,8 @@ logger = logging.getLogger(__name__)
 class TenantService:
     @staticmethod
     async def create_tenant(
-        org_id: str,
-        user_id: str,
+        org_id: UUID,
+        user_id: UUID,
         payload: CreateTenantRequest,
         db_session: AsyncSession,
     ) -> dict:
@@ -55,7 +56,7 @@ class TenantService:
 
     @staticmethod
     async def get_all_tenants(
-        org_id: str, db_session: AsyncSession, limit: int, page_num: int
+        org_id: UUID, db_session: AsyncSession, limit: int, page_num: int
     ) -> tuple[list[dict], int]:
 
         # calculate offset
@@ -82,8 +83,8 @@ class ApiKeyService:
     async def create_api_key(
         payload: CreateApiKeyRequest,
         db_session: AsyncSession,
-        org_id: str,
-        user_id: str,
+        org_id: UUID,
+        user_id: UUID,
     ) -> dict:
         # check if slug exists already
         if await ApiKeyRepository.check_by_api_key_slug(
@@ -123,7 +124,7 @@ class ApiKeyService:
 
     @staticmethod
     async def get_all_api_keys(
-        tenant_id: str, db_session: AsyncSession, limit: int, page_num: int
+        tenant_id: UUID, db_session: AsyncSession, limit: int, page_num: int
     ) -> tuple[list[dict], int]:
 
         # calculate offset
@@ -145,7 +146,7 @@ class ApiKeyService:
 
     @staticmethod
     async def revoke_api_key(
-        tenant_id: str, api_key_id: str, db_session: AsyncSession
+        tenant_id: UUID, api_key_id: UUID, db_session: AsyncSession
     ) -> None:
 
         # now mark in db as grace and add the grace time also
@@ -190,8 +191,8 @@ class ApiKeyService:
 
     @staticmethod
     async def rotate_api_key(
-        org_id: str,
-        user_id: str,
+        org_id: UUID,
+        user_id: UUID,
         payload: ApiKeyRotateRequest,
         db_session: AsyncSession,
     ) -> dict:

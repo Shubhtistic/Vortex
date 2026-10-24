@@ -202,7 +202,7 @@ class MembershipService:
     @staticmethod
     async def deactivate_member(
         db_session: AsyncSession, org_id: UUID, target_user_id: UUID
-    ) -> UUID | str:
+    ) -> UUID | None:
         if deleted_id := await MembershipRepository.deactivate_member(
             db_session=db_session, org_id=org_id, user_id=target_user_id
         ):

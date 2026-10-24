@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ class TenantRepository:
         return await create(instance=tenant_instance, db_session=db_session)
 
     @staticmethod
-    async def check_by_slug(slug: str, org_id: str, db_session: AsyncSession) -> bool:
+    async def check_by_slug(slug: str, org_id: UUID, db_session: AsyncSession) -> bool:
         return await check_exists(
             model=Tenant,
             db_session=db_session,
@@ -28,7 +29,7 @@ class TenantRepository:
 
     @staticmethod
     async def get_all_tenants(
-        org_id: str,
+        org_id: UUID,
         db_session: AsyncSession,
         offset: int,
         limit: int,
@@ -76,7 +77,7 @@ class ApiKeyRepository:
 
     @staticmethod
     async def check_by_api_key_slug(
-        api_key_slug: str, tenant_id: str, db_session: AsyncSession
+        api_key_slug: str, tenant_id: UUID, db_session: AsyncSession
     ) -> bool:
         return await check_exists(
             model=ApiKey,
@@ -86,7 +87,7 @@ class ApiKeyRepository:
 
     @staticmethod
     async def check_non_active_api_key_exists(
-        api_key_id: str, tenant_id: str, db_session: AsyncSession
+        api_key_id: UUID, tenant_id: UUID, db_session: AsyncSession
     ) -> bool:
         stmt = select(1).where(
             ApiKey.id == api_key_id,
@@ -100,8 +101,8 @@ class ApiKeyRepository:
 
     @staticmethod
     async def get_rotation_conflicts(
-        api_key_id: str,
-        tenant_id: str,
+        api_key_id: UUID,
+        tenant_id: UUID,
         api_key_slug: str,
         db_session: AsyncSession,
     ) -> tuple[bool, bool]:
@@ -123,7 +124,7 @@ class ApiKeyRepository:
 
     @staticmethod
     async def get_all_api_keys(
-        tenant_id: str, db_session: AsyncSession, offset: int, limit: int
+        tenant_id: UUID, db_session: AsyncSession, offset: int, limit: int
     ) -> tuple[list[ApiKey], int]:
 
         # get total count
@@ -159,8 +160,8 @@ class ApiKeyRepository:
 
     @staticmethod
     async def mark_as_grace_and_get_hashed_key(
-        api_key_id: str,
-        tenant_id: str,
+        api_key_id: UUID,
+        tenant_id: UUID,
         grace_period: datetime,
         db_session: AsyncSession,
     ) -> Optional[str]:
