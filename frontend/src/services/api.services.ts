@@ -1,5 +1,12 @@
 import api from "@/lib/api"
 import type {
+  AnalyticsActiveUsersPoint,
+  AnalyticsBreakdownValue,
+  AnalyticsFilters,
+  AnalyticsOverview,
+  AnalyticsRecentEvent,
+  AnalyticsTimePoint,
+  AnalyticsTopEvent,
   ApiKey,
   ApiKeyRotatePayload,
   CreateApiKeyPayload,
@@ -55,6 +62,20 @@ export const tenantApi = {
       meta: PaginationMeta
     }>("/tenants", { params }),
 
+  listAll: async (): Promise<Tenant[]> => {
+    const firstPage = await tenantApi.list({ limit: 50, page_num: 1 })
+    const tenants = firstPage.data.data ?? []
+    const totalPages = firstPage.data.meta?.total_pages ?? 1
+    if (totalPages <= 1) return tenants
+
+    const remainingPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        tenantApi.list({ limit: 50, page_num: index + 2 })
+      )
+    )
+    return tenants.concat(...remainingPages.map((page) => page.data.data ?? []))
+  },
+
   create: (payload: CreateTenantPayload) => api.post<{ data: Tenant }>("/tenants", payload),
 
   findById: async (tenantId: string): Promise<Tenant | null> => {
@@ -88,4 +109,35 @@ export const apiKeyApi = {
 
   rotate: (payload: ApiKeyRotatePayload) =>
     api.post<{ data: ApiKey }>("/tenants/api-keys/rotate", payload),
+}
+
+// ── Analytics ──
+export const analyticsApi = {
+  overview: (params: AnalyticsFilters) =>
+    api.get<{ data: AnalyticsOverview }>("/analytics/overview", { params }),
+
+  timeseries: (params: AnalyticsFilters, interval: "hour" | "day") =>
+    api.get<{ data: AnalyticsTimePoint[] }>("/analytics/timeseries", {
+      params: { ...params, interval },
+    }),
+
+  topEvents: (params: AnalyticsFilters, limit = 10) =>
+    api.get<{ data: AnalyticsTopEvent[] }>("/analytics/top-events", {
+      params: { ...params, limit },
+    }),
+
+  breakdown: (params: AnalyticsFilters, property: string, limit = 8) =>
+    api.get<{ data: AnalyticsBreakdownValue[] }>("/analytics/breakdown", {
+      params: { ...params, property, limit },
+    }),
+
+  activeUsers: (params: AnalyticsFilters, interval: "day" | "week" | "month") =>
+    api.get<{ data: AnalyticsActiveUsersPoint[] }>("/analytics/active-users", {
+      params: { ...params, interval },
+    }),
+
+  recentEvents: (params: AnalyticsFilters, limit = 30) =>
+    api.get<{ data: AnalyticsRecentEvent[] }>("/analytics/events/recent", {
+      params: { ...params, limit },
+    }),
 }

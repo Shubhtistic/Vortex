@@ -87,6 +87,58 @@ export interface Tenant {
   status: TenantStatus
 }
 
+// ── Analytics ──
+export interface AnalyticsFilters {
+  from: string
+  to: string
+  event_name?: string
+  tenant_id?: string
+}
+
+export interface AnalyticsMetricComparison {
+  current: number
+  previous: number
+  change_percent: number | null
+}
+
+export interface AnalyticsOverview {
+  total_events: AnalyticsMetricComparison
+  unique_users: AnalyticsMetricComparison
+  sessions: AnalyticsMetricComparison
+}
+
+export interface AnalyticsTimePoint {
+  bucket: string
+  count: number
+}
+
+export interface AnalyticsTopEvent {
+  event_name: string
+  count: number
+}
+
+export interface AnalyticsBreakdownValue {
+  value: string
+  count: number
+}
+
+export interface AnalyticsActiveUsersPoint {
+  bucket: string
+  active_users: number
+}
+
+export interface AnalyticsRecentEvent {
+  id: string
+  event_name: string
+  distinct_id: string
+  person_id: string | null
+  session_id: string | null
+  properties: Record<string, unknown>
+  raw_payload: Record<string, unknown>
+  occurred_at: string
+  received_at: string
+}
+
 export interface CreateApiKeyPayload {
   api_key_slug: string
   tenant_id: string

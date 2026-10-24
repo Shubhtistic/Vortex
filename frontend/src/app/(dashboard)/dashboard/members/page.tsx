@@ -89,14 +89,18 @@ export default function MembersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <span className="font-dm text-white/60 text-sm tracking-widest uppercase">Loading...</span>
-      </div>
+      <DashboardShell title="Members" subtitle="Loading members">
+        <div className="flex min-h-40 items-center justify-center">
+          <span className="font-dm text-sm uppercase tracking-widest text-white/60">
+            Loading...
+          </span>
+        </div>
+      </DashboardShell>
     )
   }
 
   return (
-    <DashboardShell title="Members" subtitle={`${members.length} members`} showDock={false}>
+    <DashboardShell title="Members" subtitle={`${members.length} members`}>
       <div className="mb-8">
         <Button onClick={() => setInviteOpen(true)} size="sm">
           Invite Member

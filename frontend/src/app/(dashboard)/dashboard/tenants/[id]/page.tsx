@@ -131,15 +131,19 @@ export default function TenantDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <span className="font-dm text-white/60 text-sm tracking-widest uppercase">Loading...</span>
-      </div>
+      <DashboardShell title="Loading tenant">
+        <div className="flex min-h-40 items-center justify-center">
+          <span className="font-dm text-sm uppercase tracking-widest text-white/60">
+            Loading...
+          </span>
+        </div>
+      </DashboardShell>
     )
   }
 
   if (!tenant) {
     return (
-      <DashboardShell title="Tenant not found" showDock={false}>
+      <DashboardShell title="Tenant not found">
         <div className="text-center py-16">
           <p className="text-white/40 font-dm">Tenant could not be loaded.</p>
           <Link
@@ -154,7 +158,7 @@ export default function TenantDetailPage() {
   }
 
   return (
-    <DashboardShell title={tenant.tenant_name} subtitle={`@${tenant.slug}`} showDock={false}>
+    <DashboardShell title={tenant.tenant_name} subtitle={`@${tenant.slug}`}>
       {/* Tenant Info */}
       <Card className="mb-8" title="Tenant Info" subtitle={`ID: ${tenant.id}`}>
         <div className="grid grid-cols-2 gap-4 text-sm">

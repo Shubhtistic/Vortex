@@ -112,7 +112,7 @@ export default function DashboardShell({
       {/* Top nav — matches landing page navbar behavior: transparent at top, glass pill on scroll */}
       <nav className="fixed top-0 left-0 right-0 z-50">
         <div
-          className={`mx-auto transition-all duration-300 max-w-6xl px-8 ${
+          className={`mx-auto w-full transition-all duration-300 max-w-[1800px] px-4 sm:px-6 xl:px-10 2xl:px-12 ${
             isScrolled ? "bg-white/5 backdrop-blur-[24px] rounded-full mt-6" : "bg-transparent mt-2"
           }`}
         >
@@ -150,10 +150,10 @@ export default function DashboardShell({
       </nav>
 
       {/* Content */}
-      <main className="pt-44 px-6 max-w-6xl mx-auto pb-28">
+      <main className="mx-auto w-full max-w-[1800px] px-4 pb-32 pt-36 sm:px-6 sm:pt-40 xl:px-10 2xl:px-12">
         {(title || subtitle) && (
-          <div className="mb-14">
-            <h1 className="text-2xl font-syne font-bold text-white">{title}</h1>
+          <div className="mb-8 sm:mb-10 2xl:mb-12">
+            <h1 className="text-2xl font-syne font-bold text-white sm:text-3xl">{title}</h1>
             {subtitle && <p className="text-sm text-white/40 font-dm mt-1">{subtitle}</p>}
           </div>
         )}

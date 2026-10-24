@@ -75,14 +75,18 @@ export default function TenantsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <span className="font-dm text-white/60 text-sm tracking-widest uppercase">Loading...</span>
-      </div>
+      <DashboardShell title="Tenants" subtitle="Loading tenants">
+        <div className="flex min-h-40 items-center justify-center">
+          <span className="font-dm text-sm uppercase tracking-widest text-white/60">
+            Loading...
+          </span>
+        </div>
+      </DashboardShell>
     )
   }
 
   return (
-    <DashboardShell title="Tenants" subtitle={`${tenants.length} tenants`} showDock={false}>
+    <DashboardShell title="Tenants" subtitle={`${tenants.length} tenants`}>
       <div className="mb-8">
         <Button onClick={() => setCreateOpen(true)} size="sm">
           Create Tenant
