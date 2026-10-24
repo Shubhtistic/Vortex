@@ -11,10 +11,15 @@ const apiPrefixes = ['auth', 'organizations', 'users', 'tenants', 'analytics', '
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   async rewrites() {
-    return apiPrefixes.map((prefix) => ({
-      source: `/${prefix}/:path*`,
-      destination: `${backendApiUrl}/${prefix}/:path*`,
-    }))
+    return apiPrefixes.flatMap((prefix) => [
+      // Keep the collection endpoint exact. A wildcard-only rewrite can turn
+      // `/tenants` into `/tenants/`, which FastAPI answers with a redirect.
+      { source: `/${prefix}`, destination: `${backendApiUrl}/${prefix}` },
+      {
+        source: `/${prefix}/:path*`,
+        destination: `${backendApiUrl}/${prefix}/:path*`,
+      },
+    ])
   },
 }
 

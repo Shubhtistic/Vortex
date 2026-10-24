@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import DashboardShell from "@/components/dashboard/DashboardShell"
 import Badge from "@/components/ui/Badge"
 import Button from "@/components/ui/Button"
@@ -21,21 +21,30 @@ export default function TenantsPage() {
   const [tenantName, setTenantName] = useState("")
   const [slug, setSlug] = useState("")
 
-  useEffect(() => {
-    tenantApi
-      .list({ limit: 50 })
-      .then((res) => {
-        if (res?.data?.data) setTenants(res.data.data)
-      })
-      .catch((err: unknown) => {
-        const msg =
-          err instanceof Error && "frontendMessage" in err
-            ? (err as { frontendMessage: string }).frontendMessage
-            : "Failed to load tenants"
-        setError(msg)
-      })
-      .finally(() => setLoading(false))
+  const loadTenants = useCallback(async () => {
+    setError("")
+    setLoading(true)
+    try {
+      setTenants(await tenantApi.listAll())
+    } catch (err: unknown) {
+      const apiError = err as {
+        frontendMessage?: string
+        response?: { data?: { message?: string; detail?: string } }
+      }
+      setError(
+        apiError.response?.data?.message ??
+          apiError.response?.data?.detail ??
+          apiError.frontendMessage ??
+          "Failed to load tenants"
+      )
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadTenants()
+  }, [loadTenants])
 
   const handleCreate = async () => {
     setError("")
@@ -46,12 +55,16 @@ export default function TenantsPage() {
     setCreating(true)
     try {
       const payload: CreateTenantPayload = { tenant_name: tenantName, slug }
-      await tenantApi.create(payload)
+      const response = await tenantApi.create(payload)
       setCreateOpen(false)
       setTenantName("")
       setSlug("")
-      const res = await tenantApi.list({ limit: 50 })
-      if (res?.data?.data) setTenants(res.data.data)
+      const createdTenant = response.data?.data
+      if (createdTenant) {
+        setTenants((current) => [createdTenant, ...current])
+      } else {
+        await loadTenants()
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error && "response" in err
@@ -92,6 +105,15 @@ export default function TenantsPage() {
           Create Tenant
         </Button>
       </div>
+
+      {error && !createOpen && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+          <span>{error}</span>
+          <Button onClick={() => void loadTenants()} size="sm" variant="ghost">
+            Retry
+          </Button>
+        </div>
+      )}
 
       <Card>
         {tenants.length === 0 ? (
