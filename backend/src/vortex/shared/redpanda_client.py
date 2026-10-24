@@ -1,11 +1,12 @@
-import asyncio, logging, orjson, contextlib
+import asyncio, logging, contextlib
 from collections.abc import Mapping
 from typing import Any, Optional
 
+import orjson as redpanda_orjson
 from aiokafka import AIOKafkaProducer as RedpandaAsyncProducer
 from aiokafka.errors import KafkaConnectionError as RedpandaConnectionError
 from aiokafka.errors import KafkaError as RedpandaClientError
-from aiokafka.helpers import create_ssl_context
+from aiokafka.helpers import create_ssl_context as create_redpanda_ssl_context
 
 from src.vortex.shared.exceptions import RedpandaNotStartedError, RedpandaPublishError
 from src.vortex.shared.config import get_settings
@@ -15,10 +16,8 @@ from src.vortex.shared.config import get_settings
 # REDIS -> Every event we send is its own small request
 # redis wont group it for us we need to group them in memory
 
-# Kafka and Redpanda were designed around batches from day one. 
-# Their wire protocol doesn’t send “one event.”
-# It sends “a batch of events” as the basic unit. 
-# So the client library does the grouping automatically:
+# Redpanda sends event batches as the basic unit, and the client library
+# groups published events automatically:
 
 
 # Redpanda producer
@@ -66,7 +65,7 @@ class RedpandaProducer:
             if protocol == "PLAINTEXT":
                 pass
             elif protocol == "SASL_SSL":
-                config["ssl_context"] = create_ssl_context()
+                config["ssl_context"] = create_redpanda_ssl_context()
                 config["sasl_mechanism"] = settings.redpanda.sasl_mechanism
                 config["sasl_plain_username"] = settings.redpanda.sasl_username
                 config["sasl_plain_password"] = settings.redpanda.sasl_password
@@ -149,8 +148,10 @@ class RedpandaProducer:
             raise RedpandaNotStartedError("Redpanda producer is not started")
 
         try:
-            value = orjson.dumps(payload, option=orjson.OPT_NON_STR_KEYS)
-        except orjson.JSONEncodeError as exc:
+            value = redpanda_orjson.dumps(
+                payload, option=redpanda_orjson.OPT_NON_STR_KEYS
+            )
+        except redpanda_orjson.JSONEncodeError as exc:
             raise RedpandaPublishError(f"Payload is not serializable: {exc}") from exc
 
         try:
