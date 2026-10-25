@@ -168,6 +168,11 @@ class PersonDistinctIdRepository:
 
     @staticmethod
     async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
+        # Acquire unique-index locks in a consistent order across concurrent
+        # processors to avoid deadlocks when batches overlap.
+        rows = sorted(
+            rows, key=lambda row: (str(row["tenant_id"]), row["distinct_id"])
+        )
         chunk_size = _safe_insert_chunk_size(PersonDistinctId, 5000)
         for batch in _chunks(rows, chunk_size):
             stmt = (

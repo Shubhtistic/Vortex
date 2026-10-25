@@ -104,9 +104,13 @@ services:
           -X brokers=127.0.0.1:19092
 
         wait "$$redpanda_pid"
+
+    # cpu quoata -> if exceeded linux throttles it
     cpus: "1.0"
-    mem_limit: 2g
-    mem_reservation: 1536m
+
+    # if mem limit reached -> oom kill
+    mem_limit: 1.5g
+    mem_reservation: 1024m
     ports:
       - "9092:9092" # for your host machine (localhost:9092)
     volumes:

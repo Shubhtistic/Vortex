@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 import logging
+import os
 from fastapi.exceptions import RequestValidationError
 from scalar_fastapi import get_scalar_api_reference
 from fastapi import FastAPI, HTTPException, Request
+from granian.utils.proxies import wrap_asgi_with_proxy_headers
 
 from src.vortex.shared.middleware import CORSMiddlewareWithSettings, log_requests
 from src.vortex.shared.redpanda_client import RedpandaProducer
@@ -90,3 +92,13 @@ app.include_router(api_router)
 @app.get("/", include_in_schema=False)
 async def scalar():
     return get_scalar_api_reference(openapi_url=app.openapi_url)
+
+
+# Granian does not automatically trust forwarded headers. Only honor them when
+# the connecting proxy is inside the configured Docker network CIDR(s).
+trusted_proxy_hosts = [
+    host.strip()
+    for host in os.getenv("GRANIAN_PROXY_TRUSTED_HOSTS", "172.16.0.0/12").split(",")
+    if host.strip()
+]
+app = wrap_asgi_with_proxy_headers(app, trusted_hosts=trusted_proxy_hosts)

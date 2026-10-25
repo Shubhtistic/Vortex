@@ -55,7 +55,4 @@ USER vortex
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json')" || exit 1
-
-CMD ["uvicorn", "src.vortex.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["granian", "src.vortex.main:app", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8000", "--http", "1", "--loop", "uvloop", "--workers", "1"]

@@ -216,9 +216,9 @@ Database schema changes are managed by Alembic under `alembic/versions/`. The Co
 
 ### Local event-ingestion load test
 
-| Run | Events | Rate | HTTP (failed) | Checks passed | Latency avg / median / p95 (ms) |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| 5 min, high volume | 3,000,500 | ~9.7k/s | 6,041 (0) | 6,001/6,001 | 29.81 / 30.84 / 56.62 |
+| Run | Target load | Events accepted | Actual rate | API latency avg / median / p95 |
+|:---:|:---:|:---:|:---:|:---:|
+| 5 min | 12,000 events/s | 3,600,500 | ~11.7k events/s | 33.93 / 34.01 / 70.4 ms |
 
-I ran this k6 test locally against `http://localhost:8000`, targeting 20 requests per second with 500 events in each request.
+The k6 run targeted 24 batch requests per second with 500 events per request. All 7,201 event-batch checks passed; 0 of 7,241 HTTP requests failed.
 **NOTE:** These results are from local testing only. After deployment, we will run the test again and add the deployed results here.
