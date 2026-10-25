@@ -5,8 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-import orjson as redpanda_orjson
-from pydantic import ValidationError
+import msgspec
 from sqlalchemy.exc import DataError as DatabaseDataError
 from sqlalchemy.exc import IntegrityError as DatabaseIntegrityError
 
@@ -15,7 +14,7 @@ from src.vortex.shared.database import SessionFactory
 from src.vortex.shared.exceptions import InvalidEventError
 from src.vortex.shared.redpanda_client import RedpandaProducer
 
-from .schemas import EventRequestSchema
+from .schemas import EventIngestionSchema
 from .services import EventService, invalid_identify_indexes
 
 logger = logging.getLogger(__name__)
@@ -23,10 +22,12 @@ logger = logging.getLogger(__name__)
 
 def _decode_event(message: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     try:
-        payload = redpanda_orjson.loads(message.value)
+        payload = msgspec.json.decode(message.value)
         if not isinstance(payload, dict):
             raise ValueError("event message must be a JSON object")
-        EventRequestSchema.model_validate(payload)
+        # Redpanda records are already JSON-decoded above. Validate the event
+        # fields with msgspec while retaining the full payload and its metadata.
+        msgspec.convert(payload, EventIngestionSchema, strict=False)
         UUID(str(payload["tenant_id"]))
         UUID(str(payload["organization_id"]))
         UUID(str(payload["api_key_id"]))
@@ -36,8 +37,8 @@ def _decode_event(message: Any) -> tuple[dict[str, Any], dict[str, Any]]:
                 raise ValueError("received_at must be an ISO 8601 string")
             datetime.fromisoformat(received_at.replace("Z", "+00:00"))
     except (
-        redpanda_orjson.JSONDecodeError,
-        ValidationError,
+        msgspec.DecodeError,
+        msgspec.ValidationError,
         ValueError,
         KeyError,
         TypeError,

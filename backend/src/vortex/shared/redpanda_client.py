@@ -2,7 +2,7 @@ import asyncio, logging, contextlib
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
-import orjson as redpanda_orjson
+import msgspec
 from aiokafka import AIOKafkaProducer as RedpandaAsyncProducer
 from aiokafka.errors import KafkaConnectionError as RedpandaConnectionError
 from aiokafka.errors import KafkaError as RedpandaClientError
@@ -126,26 +126,39 @@ class RedpandaProducer:
 
     @staticmethod
     async def send_events(
-        payloads: Sequence[Mapping[str, Any]],
+        payloads: Sequence[Mapping[str, Any] | msgspec.Struct],
         topic: str,
         partition: Optional[int] = None,
     ) -> list[dict[str, Any]]:
-        """Queue a batch together, then await all Redpanda delivery futures."""
-        producer = _redpanda_producer
-        if producer is None:
-            raise RedpandaNotStartedError("Redpanda producer is not started")
         if not payloads:
             return []
+        if _redpanda_producer is None:
+            raise RedpandaNotStartedError("Redpanda producer is not started")
 
         try:
             values = [
-                redpanda_orjson.dumps(
-                    payload, option=redpanda_orjson.OPT_NON_STR_KEYS
-                )
+                msgspec.json.encode(payload)
                 for payload in payloads
             ]
-        except redpanda_orjson.JSONEncodeError as exc:
+        except (TypeError, msgspec.EncodeError) as exc:
             raise RedpandaPublishError(f"Payload is not serializable: {exc}") from exc
+
+        return await RedpandaProducer.send_serialized_events(
+            values, topic=topic, partition=partition
+        )
+
+    @staticmethod
+    async def send_serialized_events(
+        values: Sequence[bytes],
+        topic: str,
+        partition: Optional[int] = None,
+    ) -> list[dict[str, Any]]:
+        """Publish already encoded JSON values without serializing them again."""
+        producer = _redpanda_producer
+        if producer is None:
+            raise RedpandaNotStartedError("Redpanda producer is not started")
+        if not values:
+            return []
 
         try:
             # Queue every record first so the producer can fill its partition batches,
@@ -180,7 +193,7 @@ class RedpandaProducer:
                     ) from errors[0]
                 metadata_items = delivered
         except asyncio.TimeoutError as exc:
-            logger.error("Redpanda batch send timed out (count=%d)", len(payloads))
+            logger.error("Redpanda batch send timed out (count=%d)", len(values))
             raise RedpandaPublishError("Timed out publishing batch to Redpanda") from exc
         except RedpandaClientError as exc:
             logger.error("Redpanda batch send failed: %s", exc)

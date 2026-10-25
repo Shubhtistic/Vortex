@@ -25,6 +25,7 @@ dependencies = [
     "sqlmodel>=0.0.39",
     "granian[uvloop]>=2.8.5",
     "cachetools>=7.2.4",
+    "msgspec>=0.22.0",
 ]
 
 [project.scripts]

@@ -1,10 +1,10 @@
 import asyncio
 import logging
 import time
-from collections.abc import Mapping, Sequence
-from typing import Any
+from collections import deque
+from collections.abc import Sequence
 
-import orjson
+import msgspec
 from fastapi import HTTPException, status
 
 from src.vortex.shared.config import get_settings
@@ -13,7 +13,7 @@ from src.vortex.shared.redpanda_client import RedpandaProducer
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-EventItem = tuple[Mapping[str, Any], int]
+EventItem = bytes
 _STOP = object()
 
 
@@ -21,9 +21,8 @@ class EventBuffer:
     """Bounded in-memory queue that flushes accepted events to Redpanda."""
 
     def __init__(self) -> None:
-        self._queue: asyncio.Queue[EventItem | object] = asyncio.Queue(
-            maxsize=settings.event_buffer.max_pending_events
-        )
+        self._queue: deque[EventItem | object] = deque()
+        self._items_available = asyncio.Event()
         self._worker: asyncio.Task[None] | None = None
         self._accepting = False
         self._pending_events = 0
@@ -42,7 +41,7 @@ class EventBuffer:
             settings.event_buffer.max_pending_bytes,
         )
 
-    def enqueue(self, events: Sequence[Mapping[str, Any]]) -> None:
+    def enqueue(self, events: Sequence[msgspec.Struct]) -> None:
         """Accept a whole request atomically, or reject it without partial enqueue."""
         if not events:
             return
@@ -50,17 +49,16 @@ class EventBuffer:
             raise self._unavailable_response()
 
         try:
-            sized_events = [
-                (event, len(orjson.dumps(event, option=orjson.OPT_NON_STR_KEYS)))
-                for event in events
-            ]
-        except (TypeError, orjson.JSONEncodeError) as exc:
+            # Serialize once so the exact queued size is also the exact value
+            # later published to Redpanda.
+            encoded_events = [msgspec.json.encode(event) for event in events]
+        except (TypeError, msgspec.EncodeError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Event batch contains a value that cannot be serialized",
             ) from exc
 
-        batch_bytes = sum(size for _, size in sized_events)
+        batch_bytes = sum(map(len, encoded_events))
         if batch_bytes > settings.event_buffer.max_pending_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -68,7 +66,7 @@ class EventBuffer:
             )
 
         if (
-            self._pending_events + len(sized_events)
+            self._pending_events + len(encoded_events)
             > settings.event_buffer.max_pending_events
             or self._pending_bytes + batch_bytes
             > settings.event_buffer.max_pending_bytes
@@ -76,7 +74,7 @@ class EventBuffer:
             logger.warning(
                 "Rejected event batch because buffer is full "
                 "(request_events=%d request_bytes=%d pending_events=%d pending_bytes=%d)",
-                len(sized_events),
+                len(encoded_events),
                 batch_bytes,
                 self._pending_events,
                 self._pending_bytes,
@@ -85,9 +83,9 @@ class EventBuffer:
 
         # No await occurs between capacity validation and enqueue, so another
         # request cannot take this capacity midway through the operation.
-        for item in sized_events:
-            self._queue.put_nowait(item)
-        self._pending_events += len(sized_events)
+        self._queue.extend(encoded_events)
+        self._items_available.set()
+        self._pending_events += len(encoded_events)
         self._pending_bytes += batch_bytes
 
     async def stop(self) -> None:
@@ -101,10 +99,8 @@ class EventBuffer:
                 deadline = time.monotonic() + settings.event_buffer.shutdown_timeout_seconds
                 # The sentinel follows all accepted events, so normal shutdown
                 # drains the queue before the Redpanda producer is closed.
-                await asyncio.wait_for(
-                    self._queue.put(_STOP),
-                    timeout=max(0, deadline - time.monotonic()),
-                )
+                self._queue.append(_STOP)
+                self._items_available.set()
                 await asyncio.wait_for(
                     asyncio.shield(worker),
                     timeout=max(0, deadline - time.monotonic()),
@@ -133,38 +129,45 @@ class EventBuffer:
     async def _flush_loop(self) -> None:
         stop_after_batch = False
         while True:
-            first = await self._queue.get()
+            while not self._queue:
+                self._items_available.clear()
+                await self._items_available.wait()
+
+            first = self._queue.popleft()
             if first is _STOP:
-                self._queue.task_done()
                 return
 
             batch: list[EventItem] = [first]
-            batch_bytes = first[1]
+            batch_bytes = len(first)
             deadline = time.monotonic() + settings.event_buffer.flush_interval_seconds
 
             while len(batch) < settings.event_buffer.max_batch_size:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
-                try:
-                    item = await asyncio.wait_for(self._queue.get(), timeout=remaining)
-                except asyncio.TimeoutError:
-                    break
+                if not self._queue:
+                    self._items_available.clear()
+                    try:
+                        await asyncio.wait_for(
+                            self._items_available.wait(), timeout=remaining
+                        )
+                    except asyncio.TimeoutError:
+                        break
+                    if not self._queue:
+                        continue
+
+                item = self._queue.popleft()
 
                 if item is _STOP:
-                    self._queue.task_done()
                     stop_after_batch = True
                     break
 
-                event_item = item
-                batch.append(event_item)
-                batch_bytes += event_item[1]
+                batch.append(item)
+                batch_bytes += len(item)
 
             await self._publish_with_retry(batch)
             self._pending_events -= len(batch)
             self._pending_bytes -= batch_bytes
-            for _ in batch:
-                self._queue.task_done()
 
             logger.debug(
                 "Flushed event batch (count=%d bytes=%d pending=%d)",
@@ -179,8 +182,8 @@ class EventBuffer:
         delay_seconds = 1.0
         while True:
             try:
-                await RedpandaProducer.send_events(
-                    [event for event, _ in batch],
+                await RedpandaProducer.send_serialized_events(
+                    batch,
                     topic=settings.redpanda.events_topic,
                 )
                 return
@@ -224,5 +227,5 @@ async def stop_event_buffer() -> None:
     await event_buffer.stop()
 
 
-def enqueue_events(events: Sequence[Mapping[str, Any]]) -> None:
+def enqueue_events(events: Sequence[msgspec.Struct]) -> None:
     event_buffer.enqueue(events)
