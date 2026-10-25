@@ -13,6 +13,7 @@ example.env
 .mypy_cache/
 .ruff_cache/
 tests/
+internal/
 .dockerignore
 Dockerfile
 compose.yml
