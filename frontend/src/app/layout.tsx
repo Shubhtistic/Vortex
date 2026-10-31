@@ -20,6 +20,9 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: "Vortex",
   description: "Next-gen event tracking",
+  icons: {
+    icon: "/logo.png",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

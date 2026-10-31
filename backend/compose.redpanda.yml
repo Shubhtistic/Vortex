@@ -57,7 +57,7 @@ services:
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v26.2.6
     container_name: redpanda
-    restart: on-failure:3
+    restart: unless-stopped
     environment:
       REDPANDA_EVENTS_TOPIC: ${REDPANDA_EVENTS_TOPIC:-vortex.events}
       REDPANDA_DLQ_TOPIC: ${REDPANDA_DLQ_TOPIC:-vortex.events.dlq}
