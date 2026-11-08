@@ -1,0 +1,139 @@
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    volumes:
+      - vortex_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    cpus: "1"
+    mem_limit: 2.5g
+    mem_reservation: 1.5g
+    shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  # alembic container
+  migrate:
+    build:
+      context: .
+      target: runtime
+    env_file: .env
+    command: alembic upgrade head # closes the container after this as pid 1 gets completed
+    cpus: "0.3"
+    mem_limit: 384m
+    mem_reservation: 256m
+    depends_on:
+      postgres:
+        condition: service_healthy 
+
+  # redis
+  redis:
+    image: redis:7.4.11-bookworm
+    ports:
+      - "6380:6379"
+    command:
+      - redis-server
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-128mb}
+      - --maxmemory-policy
+      - volatile-lru
+    cpus: "0.2"
+    mem_limit: 90m
+    mem_reservation: 75m
+
+  fastapi:
+    build:
+      context: .
+      target: runtime
+    command:
+      - granian
+      - src.vortex.main:app
+      - --interface
+      - asgi
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --http
+      - "1"
+      - --loop
+      - uvloop
+      - --workers
+      - "${GRANIAN_WORKERS:-2}"
+      - --backpressure
+      - "${GRANIAN_BACKPRESSURE:-2000}"
+    # Start three identical containers from this one service definition.
+    scale: 3
+    cpus: "2"
+    mem_limit: 1g
+    mem_reservation: 768m
+    env_file:
+      - .env
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    depends_on:
+      migrate:
+        condition: service_completed_successfully  # migrations must finish before api starts
+      redis:
+        condition: service_started
+    networks:
+      - default
+      - my-redpanda-net
+
+  # Nginx is the public HTTP entry point; FastAPI stays on the Compose network.
+  nginx:
+    image: nginx:1.30.6
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - fastapi
+    cpus: "1"
+    mem_limit: 512m
+    mem_reservation: 256m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  # Redpanda consumer persists event batches to Postgres.
+  event-processor:
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "src.vortex.worker"]
+    restart: unless-stopped
+    scale: 3
+    cpus: "1"
+    mem_limit: 512m
+    mem_reservation: 512m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    env_file:
+      - .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - default
+      - my-redpanda-net
+
+volumes:
+  vortex_pg_data:
+
+networks:
+  my-redpanda-net:
+    external: true
