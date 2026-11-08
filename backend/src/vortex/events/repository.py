@@ -7,7 +7,7 @@ from sqlalchemy import case, delete, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.infrastructure.database import execute_query
+from src.vortex.infrastructure.repo_helpers import execute_query
 
 from .consts import EVENTS_INSERT_CHUNK_SIZE
 from .models import Event, Group, Person, PersonDistinctId, PersonGroup

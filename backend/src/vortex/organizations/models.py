@@ -2,7 +2,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from uuid import UUID, uuid7
 from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, DateTime, ForeignKey, Index, UniqueConstraint, text
+from sqlalchemy import Column, DateTime, ForeignKey, Index, text
 
 from .enums import MembershipRole
 

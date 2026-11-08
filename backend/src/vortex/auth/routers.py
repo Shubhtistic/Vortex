@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Cookie, Response
 
-from src.vortex.api.schemas import ApiResponseSchema
 from src.vortex.api.responses import ApiResponse
 
 from .dependencies import OptionalUserDep

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.vortex.organizations.enums import MembershipRole
 
 from .models import Organization, OrganizationMembership
-from src.vortex.infrastructure.database import (
+from src.vortex.infrastructure.repo_helpers import (
     check_exists,
     create,
     execute_query,

@@ -4,11 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import User
-from src.vortex.infrastructure.database import (
+from src.vortex.infrastructure.repo_helpers import (
     check_exists,
     create,
     get_all,
-    get_one,
     get_one_by_query,
 )
 
