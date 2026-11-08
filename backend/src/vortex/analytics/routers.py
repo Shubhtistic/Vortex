@@ -8,7 +8,7 @@ from src.vortex.auth.dependencies import CurrentUserDep
 from src.vortex.shared.responses import ApiResponse
 
 from .schemas import AnalyticsFilters
-from .service import AnalyticsService
+from .services import AnalyticsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 

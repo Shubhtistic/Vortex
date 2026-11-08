@@ -5,7 +5,7 @@ from src.vortex.auth.routers import router as auth_router
 from src.vortex.tenants.routers import router as tenants_router
 from src.vortex.users.routers import router as user_router
 from src.vortex.events.routers import router as event_router
-from src.vortex.analytics.router import router as analytics_router
+from src.vortex.analytics.routers import router as analytics_router
 
 router = APIRouter()
 
