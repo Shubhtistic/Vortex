@@ -6,7 +6,11 @@ from src.vortex.shared.responses import ApiResponse
 from src.vortex.shared.database import DbSessionDep
 from src.vortex.auth.dependencies import CurrentUserDep, VerifiedAdminDep
 
-from .exceptions import ApiKeyAlreadyNonActiveError, SlugAlreadyExistsErorr
+from .exceptions import (
+    ApiKeyAlreadyNonActiveError,
+    SlugAlreadyExistsErorr,
+    TenantNotFoundError,
+)
 from .services import ApiKeyService, TenantService
 from .schemas import ApiKeyRotateRequest, CreateApiKeyRequest, CreateTenantRequest
 
@@ -87,6 +91,8 @@ async def create_an_api_key(
             org_id=user_data.get("org_id"),
             user_id=user_data.get("user_id"),
         )
+    except TenantNotFoundError:
+        return ApiResponse.error(message="tenant not found", code=404)
     except SlugAlreadyExistsErorr:
         return ApiResponse.error(message="this slug is already taken", code=409)
 
@@ -106,6 +112,7 @@ async def get_all_api_keys(
 ):
 
     api_keys_dict, total_count = await ApiKeyService.get_all_api_keys(
+        org_id=user_data.get("org_id"),
         tenant_id=tenant_id,
         db_session=db_session,
         limit=limit,
@@ -135,7 +142,10 @@ async def revoke_api_key(
     # call service to delete the api_key_id
     try:
         await ApiKeyService.revoke_api_key(
-            tenant_id=tenant_id, api_key_id=api_key_id, db_session=db_session
+            org_id=user_data.get("org_id"),
+            tenant_id=tenant_id,
+            api_key_id=api_key_id,
+            db_session=db_session,
         )
     except ApiKeyAlreadyNonActiveError:
         return ApiResponse.error(
@@ -161,6 +171,9 @@ async def rotate_api_key(
         return ApiResponse.error(
             code=409, message="The key is already revoked or is in grace period"
         )
+
+    except TenantNotFoundError:
+        return ApiResponse.error(message="tenant not found", code=404)
 
     except SlugAlreadyExistsErorr:
         return ApiResponse.error(code=409, message="The key slug is already taken")

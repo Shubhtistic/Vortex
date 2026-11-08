@@ -28,6 +28,17 @@ class TenantRepository:
         )
 
     @staticmethod
+    async def exists_by_id_and_org(
+        tenant_id: UUID, org_id: UUID, db_session: AsyncSession
+    ) -> bool:
+        """Check tenant ownership without fetching the full tenant row."""
+        return await check_exists(
+            model=Tenant,
+            db_session=db_session,
+            filters={"id": tenant_id, "organization_id": org_id},
+        )
+
+    @staticmethod
     async def get_all_tenants(
         org_id: UUID,
         db_session: AsyncSession,
@@ -77,20 +88,32 @@ class ApiKeyRepository:
 
     @staticmethod
     async def check_by_api_key_slug(
-        api_key_slug: str, tenant_id: UUID, db_session: AsyncSession
+        api_key_slug: str,
+        tenant_id: UUID,
+        org_id: UUID,
+        db_session: AsyncSession,
     ) -> bool:
+
         return await check_exists(
             model=ApiKey,
             db_session=db_session,
-            filters={"api_key_slug": api_key_slug, "tenant_id": tenant_id},
+            filters={
+                "api_key_slug": api_key_slug,
+                "organization_id": org_id,
+                "tenant_id": tenant_id,
+            },
         )
 
     @staticmethod
     async def check_non_active_api_key_exists(
-        api_key_id: UUID, tenant_id: UUID, db_session: AsyncSession
+        api_key_id: UUID,
+        tenant_id: UUID,
+        org_id: UUID,
+        db_session: AsyncSession,
     ) -> bool:
         stmt = select(1).where(
             ApiKey.id == api_key_id,
+            ApiKey.organization_id == org_id,
             ApiKey.tenant_id == tenant_id,
             ApiKey.status != ApiKeyStatus.active,
         )
@@ -103,20 +126,27 @@ class ApiKeyRepository:
     async def get_rotation_conflicts(
         api_key_id: UUID,
         tenant_id: UUID,
+        org_id: UUID,
         api_key_slug: str,
         db_session: AsyncSession,
     ) -> tuple[bool, bool]:
         """Check both rotation preconditions in one database round trip."""
         stmt = select(
-            exists().where(
+            exists()
+            .where(
                 ApiKey.id == api_key_id,
+                ApiKey.organization_id == org_id,
                 ApiKey.tenant_id == tenant_id,
                 ApiKey.status != ApiKeyStatus.active,
-            ).label("is_non_active"),
-            exists().where(
+            )
+            .label("is_non_active"),
+            exists()
+            .where(
                 ApiKey.api_key_slug == api_key_slug,
+                ApiKey.organization_id == org_id,
                 ApiKey.tenant_id == tenant_id,
-            ).label("slug_exists"),
+            )
+            .label("slug_exists"),
         )
         result = await execute_query(query=stmt, db_session=db_session)
         row = result.one()
@@ -124,21 +154,32 @@ class ApiKeyRepository:
 
     @staticmethod
     async def get_all_api_keys(
-        tenant_id: UUID, db_session: AsyncSession, offset: int, limit: int
+        tenant_id: UUID,
+        org_id: UUID,
+        db_session: AsyncSession,
+        offset: int,
+        limit: int,
     ) -> tuple[list[ApiKey], int]:
 
         # get total count
         total_count_stmt = (
             select(func.count())
             .select_from(ApiKey)
-            .where(ApiKey.tenant_id == tenant_id)
+            .where(
+                ApiKey.organization_id == org_id,
+                ApiKey.tenant_id == tenant_id,
+            )
         )
 
         # get paginated data
 
         query = (
             select(ApiKey, total_count_stmt.scalar_subquery().label("total_count"))
-            .where(ApiKey.tenant_id == tenant_id, ApiKey.status == ApiKeyStatus.active)
+            .where(
+                ApiKey.organization_id == org_id,
+                ApiKey.tenant_id == tenant_id,
+                ApiKey.status == ApiKeyStatus.active,
+            )
             .order_by(ApiKey.created_at.desc())
             .limit(limit)
             .offset(offset)
@@ -162,6 +203,7 @@ class ApiKeyRepository:
     async def mark_as_grace_and_get_hashed_key(
         api_key_id: UUID,
         tenant_id: UUID,
+        org_id: UUID,
         grace_period: datetime,
         db_session: AsyncSession,
     ) -> Optional[str]:
@@ -170,6 +212,7 @@ class ApiKeyRepository:
             update(ApiKey)
             .where(
                 ApiKey.id == api_key_id,
+                ApiKey.organization_id == org_id,
                 ApiKey.tenant_id == tenant_id,
                 ApiKey.status == ApiKeyStatus.active,
             )

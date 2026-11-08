@@ -6,6 +6,11 @@ class SlugAlreadyExistsErorr(Exception):
     shared by both tenants & api key's"""
 
 
+class TenantNotFoundError(Exception):
+    """raise when a tenant does not exist in the caller's organization
+    hides whether the tenant exists in another organization"""
+
+
 # =========== Api key Exceptions =======
 
 

@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.vortex.shared.config import get_settings
 
 from .utils import create_api_key, hash_api_key, remove_api_key_from_cache
-from .exceptions import ApiKeyAlreadyNonActiveError, SlugAlreadyExistsErorr
+from .exceptions import (
+    ApiKeyAlreadyNonActiveError,
+    SlugAlreadyExistsErorr,
+    TenantNotFoundError,
+)
+
 from .schemas import (
     ApiKeyRead,
     ApiKeyRotateRequest,
@@ -24,6 +29,21 @@ logger = logging.getLogger(__name__)
 
 
 class TenantService:
+    @staticmethod
+    async def ensure_tenant_in_org(
+        tenant_id: UUID, org_id: UUID, db_session: AsyncSession
+    ) -> None:
+        """Reject tenant-scoped operations unless the tenant belongs to the caller."""
+
+        tenant_exists = await TenantRepository.exists_by_id_and_org(
+            tenant_id=tenant_id, org_id=org_id, db_session=db_session
+        )
+        if not tenant_exists:
+            logger.warning(
+                "Tenant access rejected: tenant not found in caller organization"
+            )
+            raise TenantNotFoundError
+
     @staticmethod
     async def create_tenant(
         org_id: UUID,
@@ -86,10 +106,15 @@ class ApiKeyService:
         org_id: UUID,
         user_id: UUID,
     ) -> dict:
+        await TenantService.ensure_tenant_in_org(
+            tenant_id=payload.tenant_id, org_id=org_id, db_session=db_session
+        )
+
         # check if slug exists already
         if await ApiKeyRepository.check_by_api_key_slug(
             api_key_slug=payload.api_key_slug,
             tenant_id=payload.tenant_id,
+            org_id=org_id,
             db_session=db_session,
         ):
             logger.warning("API key creation rejected: slug already exists")
@@ -124,16 +149,23 @@ class ApiKeyService:
 
     @staticmethod
     async def get_all_api_keys(
-        tenant_id: UUID, db_session: AsyncSession, limit: int, page_num: int
+        org_id: UUID,
+        tenant_id: UUID,
+        db_session: AsyncSession,
+        limit: int,
+        page_num: int,
     ) -> tuple[list[dict], int]:
-
         # calculate offset
         offset = (page_num - 1) * limit
 
         # call repo to get results
 
         api_keys, total_count = await ApiKeyRepository.get_all_api_keys(
-            tenant_id=tenant_id, db_session=db_session, offset=offset, limit=limit
+            tenant_id=tenant_id,
+            org_id=org_id,
+            db_session=db_session,
+            offset=offset,
+            limit=limit,
         )
 
         if total_count == 0:
@@ -146,9 +178,8 @@ class ApiKeyService:
 
     @staticmethod
     async def revoke_api_key(
-        tenant_id: UUID, api_key_id: UUID, db_session: AsyncSession
+        org_id: UUID, tenant_id: UUID, api_key_id: UUID, db_session: AsyncSession
     ) -> None:
-
         # now mark in db as grace and add the grace time also
         GRACE_PERIOD_MINS = (get_settings()).project.grace_period_mins
 
@@ -158,6 +189,7 @@ class ApiKeyService:
         hashed_api_key = await ApiKeyRepository.mark_as_grace_and_get_hashed_key(
             api_key_id=api_key_id,
             tenant_id=tenant_id,
+            org_id=org_id,
             grace_period=grace_period,
             db_session=db_session,
         )
@@ -166,7 +198,10 @@ class ApiKeyService:
         # matched no active row, which saves a query for the normal revoke path.
         if hashed_api_key is None:
             is_non_active = await ApiKeyRepository.check_non_active_api_key_exists(
-                api_key_id=api_key_id, tenant_id=tenant_id, db_session=db_session
+                api_key_id=api_key_id,
+                tenant_id=tenant_id,
+                org_id=org_id,
+                db_session=db_session,
             )
             if is_non_active:
                 raise ApiKeyAlreadyNonActiveError
@@ -196,12 +231,16 @@ class ApiKeyService:
         payload: ApiKeyRotateRequest,
         db_session: AsyncSession,
     ) -> dict:
+        await TenantService.ensure_tenant_in_org(
+            tenant_id=payload.tenant_id, org_id=org_id, db_session=db_session
+        )
 
         # step 1 -> check if this key is already revoked or in grace period
         # Check the new slug in the same query before changing the existing key.
         is_non_active, slug_exists = await ApiKeyRepository.get_rotation_conflicts(
             api_key_id=payload.api_key_id,
             tenant_id=payload.tenant_id,
+            org_id=org_id,
             api_key_slug=payload.api_key_slug,
             db_session=db_session,
         )
@@ -227,6 +266,7 @@ class ApiKeyService:
         hashed_api_key = await ApiKeyRepository.mark_as_grace_and_get_hashed_key(
             api_key_id=payload.api_key_id,
             tenant_id=payload.tenant_id,
+            org_id=org_id,
             grace_period=grace_period,
             db_session=db_session,
         )

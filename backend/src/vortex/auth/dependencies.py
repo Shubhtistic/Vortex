@@ -121,5 +121,5 @@ async def verified_owner_dep(
 
 CurrentUserDep = Annotated[dict, Depends(current_user_dep)]
 VerifiedAdminDep = Annotated[dict, Depends(verified_admin_dep)]
-VerifiedOwnerDep = Annotated[dict, Depends(verified_admin_dep)]
+VerifiedOwnerDep = Annotated[dict, Depends(verified_owner_dep)]
 OptionalUserDep = Annotated[dict, Depends(optional_current_user_dep)]
