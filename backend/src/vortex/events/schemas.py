@@ -4,17 +4,10 @@ from uuid import UUID
 
 import msgspec
 
-
-EventName = Annotated[
-    str, msgspec.Meta(min_length=1, max_length=200, pattern=r"\S")
-]
-DistinctId = Annotated[
-    str, msgspec.Meta(min_length=1, max_length=200, pattern=r"\S")
-]
+EventName = Annotated[str, msgspec.Meta(min_length=1, max_length=200, pattern=r"\S")]
+DistinctId = Annotated[str, msgspec.Meta(min_length=1, max_length=200, pattern=r"\S")]
 OptionalText200 = Annotated[str, msgspec.Meta(max_length=200, pattern=r"\S")] | None
-OptionalLibVersion = (
-    Annotated[str, msgspec.Meta(max_length=50, pattern=r"\S")] | None
-)
+OptionalLibVersion = Annotated[str, msgspec.Meta(max_length=50, pattern=r"\S")] | None
 
 
 class EventIngestionSchema(msgspec.Struct):

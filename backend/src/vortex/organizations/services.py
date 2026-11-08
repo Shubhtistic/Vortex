@@ -38,9 +38,7 @@ class OrganizationService:
 
             org = await OrganizationRepository.create_organization(
                 db_session=db_session,
-                instance=Organization(
-                    name=signup_data.org_name, slug=signup_data.slug
-                ),
+                instance=Organization(name=signup_data.org_name, slug=signup_data.slug),
             )
 
             user = await UserService.create_user(
@@ -208,9 +206,7 @@ class MembershipService:
             return data, total_count
 
     @staticmethod
-    async def deactivate_member(
-        org_id: UUID, target_user_id: UUID
-    ) -> UUID | None:
+    async def deactivate_member(org_id: UUID, target_user_id: UUID) -> UUID | None:
         async with get_db_session() as db_session:
             if deleted_id := await MembershipRepository.deactivate_member(
                 db_session=db_session, org_id=org_id, user_id=target_user_id

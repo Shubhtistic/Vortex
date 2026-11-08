@@ -41,12 +41,8 @@ class AnalyticsRepository:
         )
         stmt = (
             select(
-                func.count(Event.id)
-                .filter(current_window)
-                .label("current_events"),
-                func.count(Event.id)
-                .filter(previous_window)
-                .label("previous_events"),
+                func.count(Event.id).filter(current_window).label("current_events"),
+                func.count(Event.id).filter(previous_window).label("previous_events"),
                 func.count(distinct(Event.person_id))
                 .filter(current_window)
                 .label("current_users"),

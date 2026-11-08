@@ -78,9 +78,7 @@ class EventRepository:
         }
         if not person_merges:
             return
-        for batch in _chunks(
-            person_merges.items(), _safe_mapping_chunk_size()
-        ):
+        for batch in _chunks(person_merges.items(), _safe_mapping_chunk_size()):
             mapping = dict(batch)
             stmt = (
                 update(Event)
@@ -127,9 +125,7 @@ class PersonRepository:
                 update(Person)
                 .where(Person.id.in_(mapping))
                 .values(
-                    properties=case(
-                        mapping, value=Person.id, else_=Person.properties
-                    ),
+                    properties=case(mapping, value=Person.id, else_=Person.properties),
                     updated_at=datetime.now(timezone.utc),
                 )
             )
@@ -170,9 +166,7 @@ class PersonDistinctIdRepository:
     async def create_many(rows: list[dict[str, Any]], session: AsyncSession) -> None:
         # Acquire unique-index locks in a consistent order across concurrent
         # processors to avoid deadlocks when batches overlap.
-        rows = sorted(
-            rows, key=lambda row: (str(row["tenant_id"]), row["distinct_id"])
-        )
+        rows = sorted(rows, key=lambda row: (str(row["tenant_id"]), row["distinct_id"]))
         chunk_size = _safe_insert_chunk_size(PersonDistinctId, 5000)
         for batch in _chunks(rows, chunk_size):
             stmt = (
@@ -225,7 +219,10 @@ class GroupRepository:
             )
             result = await execute_query(query=stmt, db_session=session)
             groups.update(
-                {(group.tenant_id, group.group_key): group for group in result.scalars()}
+                {
+                    (group.tenant_id, group.group_key): group
+                    for group in result.scalars()
+                }
             )
         return groups
 
@@ -301,8 +298,7 @@ class PersonGroupRepository:
             )
             links.extend(await execute_query(query=stmt, db_session=session))
         target_links = {
-            (person_merges[source_id], group_id)
-            for source_id, group_id in links
+            (person_merges[source_id], group_id) for source_id, group_id in links
         }
         rows = [
             {

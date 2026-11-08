@@ -36,9 +36,7 @@ async def get_overview(
         organization_id=current_user["org_id"],
         filters=filters,
     )
-    return ApiResponse.success(
-        message="Analytics overview fetched", data=result
-    )
+    return ApiResponse.success(message="Analytics overview fetched", data=result)
 
 
 @router.get("/timeseries")
@@ -52,9 +50,7 @@ async def get_timeseries(
         filters=filters,
         interval=interval,
     )
-    return ApiResponse.success(
-        message="Analytics timeseries fetched", data=result
-    )
+    return ApiResponse.success(message="Analytics timeseries fetched", data=result)
 
 
 @router.get("/top-events")
@@ -68,9 +64,7 @@ async def get_top_events(
         filters=filters,
         limit=limit,
     )
-    return ApiResponse.success(
-        message="Top events fetched", data=result
-    )
+    return ApiResponse.success(message="Top events fetched", data=result)
 
 
 @router.get("/breakdown")
@@ -86,9 +80,7 @@ async def get_breakdown(
         property_name=property_name,
         limit=limit,
     )
-    return ApiResponse.success(
-        message="Analytics breakdown fetched", data=result
-    )
+    return ApiResponse.success(message="Analytics breakdown fetched", data=result)
 
 
 @router.get("/active-users")
@@ -102,9 +94,7 @@ async def get_active_users(
         filters=filters,
         interval=interval,
     )
-    return ApiResponse.success(
-        message="Active users fetched", data=result
-    )
+    return ApiResponse.success(message="Active users fetched", data=result)
 
 
 @router.get("/events/recent")
@@ -118,6 +108,4 @@ async def get_recent_events(
         filters=filters,
         limit=limit,
     )
-    return ApiResponse.success(
-        message="Recent events fetched", data=result
-    )
+    return ApiResponse.success(message="Recent events fetched", data=result)

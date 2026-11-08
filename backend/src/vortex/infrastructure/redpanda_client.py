@@ -23,6 +23,7 @@ from src.vortex.infrastructure.config import get_settings
 _redpanda_producer: Optional[RedpandaAsyncProducer] = None
 _lifecycle_lock = asyncio.Lock()
 
+
 class RedpandaNotStartedError(RuntimeError):
     """Raised when a message is published before the producer starts."""
 
@@ -143,10 +144,7 @@ class RedpandaProducer:
             raise RedpandaNotStartedError("Redpanda producer is not started")
 
         try:
-            values = [
-                msgspec.json.encode(payload)
-                for payload in payloads
-            ]
+            values = [msgspec.json.encode(payload) for payload in payloads]
         except (TypeError, msgspec.EncodeError) as exc:
             raise RedpandaPublishError(f"Payload is not serializable: {exc}") from exc
 
@@ -201,7 +199,9 @@ class RedpandaProducer:
                 metadata_items = delivered
         except asyncio.TimeoutError as exc:
             logger.error("Redpanda batch send timed out (count=%d)", len(values))
-            raise RedpandaPublishError("Timed out publishing batch to Redpanda") from exc
+            raise RedpandaPublishError(
+                "Timed out publishing batch to Redpanda"
+            ) from exc
         except RedpandaClientError as exc:
             logger.error("Redpanda batch send failed: %s", exc)
             raise RedpandaPublishError(f"Redpanda publish failed: {exc}") from exc

@@ -76,9 +76,7 @@ class Person(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
 
-    tenant_id: UUID = Field(
-        sa_column=Column(ForeignKey("tenants.id"), nullable=False)
-    )
+    tenant_id: UUID = Field(sa_column=Column(ForeignKey("tenants.id"), nullable=False))
 
     properties: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB))
 
@@ -99,9 +97,7 @@ class PersonDistinctId(SQLModel, table=True):
     __tablename__ = "person_distinct_ids"
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
-    tenant_id: UUID = Field(
-        sa_column=Column(ForeignKey("tenants.id"), nullable=False)
-    )
+    tenant_id: UUID = Field(sa_column=Column(ForeignKey("tenants.id"), nullable=False))
     person_id: UUID = Field(
         sa_column=Column(ForeignKey("persons.id"), index=True, nullable=False)
     )
@@ -122,9 +118,7 @@ class Group(SQLModel, table=True):
     __tablename__ = "groups"
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
-    tenant_id: UUID = Field(
-        sa_column=Column(ForeignKey("tenants.id"), nullable=False)
-    )
+    tenant_id: UUID = Field(sa_column=Column(ForeignKey("tenants.id"), nullable=False))
 
     group_key: str
 
@@ -153,12 +147,8 @@ class PersonGroup(SQLModel, table=True):
     __tablename__ = "person_groups"
 
     id: UUID = Field(default_factory=uuid7, primary_key=True)
-    person_id: UUID = Field(
-        sa_column=Column(ForeignKey("persons.id"), nullable=False)
-    )
-    group_id: UUID = Field(
-        sa_column=Column(ForeignKey("groups.id"), nullable=False)
-    )
+    person_id: UUID = Field(sa_column=Column(ForeignKey("persons.id"), nullable=False))
+    group_id: UUID = Field(sa_column=Column(ForeignKey("groups.id"), nullable=False))
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

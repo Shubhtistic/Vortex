@@ -112,9 +112,7 @@ class MembershipRepository:
                     OrganizationMembership.is_active == True,
                 )
             )
-            count_result = await execute_query(
-                query=count_stmt, db_session=db_session
-            )
+            count_result = await execute_query(query=count_stmt, db_session=db_session)
             total_count = count_result.scalar_one()
         return data, total_count
 

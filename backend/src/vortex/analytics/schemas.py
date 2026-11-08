@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-
 AnalyticsInterval = Literal["hour", "day"]
 ActiveUserInterval = Literal["day", "week", "month"]
 

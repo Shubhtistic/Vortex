@@ -31,9 +31,7 @@ logger = logging.getLogger(__name__)
 
 class AuthService:
     @staticmethod
-    async def login(
-        org_slug: str, email: str, plain_password: str
-    ) -> tuple[str, str]:
+    async def login(org_slug: str, email: str, plain_password: str) -> tuple[str, str]:
         async with get_db_session() as db_session:
             return await AuthService._login(
                 db_session=db_session,
@@ -87,9 +85,7 @@ class AuthService:
         return access_token, refresh_token
 
     @staticmethod
-    async def refresh(
-        raw_refresh_token: str
-    ) -> tuple[str, str, datetime]:
+    async def refresh(raw_refresh_token: str) -> tuple[str, str, datetime]:
         """try to rotate a refresh token and if succeeds send (access_token, refresh_token)"""
         async with get_db_session() as db_session:
             return await AuthService._refresh(

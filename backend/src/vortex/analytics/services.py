@@ -59,7 +59,9 @@ class AnalyticsService:
     @staticmethod
     async def overview(organization_id: UUID, filters: AnalyticsFilters) -> dict:
         async with get_db_session() as db_session:
-            return await AnalyticsService._overview(organization_id, filters, db_session)
+            return await AnalyticsService._overview(
+                organization_id, filters, db_session
+            )
 
     @staticmethod
     async def _overview(

@@ -32,7 +32,9 @@ class EventBuffer:
         if self._worker is not None and not self._worker.done():
             return
         self._accepting = True
-        self._worker = asyncio.create_task(self._flush_loop(), name="event-buffer-flusher")
+        self._worker = asyncio.create_task(
+            self._flush_loop(), name="event-buffer-flusher"
+        )
         logger.info(
             "Event buffer started (flush_size=%d flush_interval=%.3fs max_events=%d max_bytes=%d)",
             settings.event_buffer.max_batch_size,
@@ -96,7 +98,9 @@ class EventBuffer:
 
         if not worker.done():
             try:
-                deadline = time.monotonic() + settings.event_buffer.shutdown_timeout_seconds
+                deadline = (
+                    time.monotonic() + settings.event_buffer.shutdown_timeout_seconds
+                )
                 # The sentinel follows all accepted events, so normal shutdown
                 # drains the queue before the Redpanda producer is closed.
                 self._queue.append(_STOP)

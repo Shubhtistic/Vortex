@@ -85,8 +85,7 @@ class TenantService:
                 return [], 0
 
             return [
-                TenantRead.model_validate(tenant).model_dump()
-                for tenant in tenants
+                TenantRead.model_validate(tenant).model_dump() for tenant in tenants
             ], total_count
 
 
@@ -150,14 +149,11 @@ class ApiKeyService:
                 logger.debug("No API keys found")
                 return [], 0
             return [
-                ApiKeyRead.model_validate(api_key).model_dump()
-                for api_key in api_keys
+                ApiKeyRead.model_validate(api_key).model_dump() for api_key in api_keys
             ], total_count
 
     @staticmethod
-    async def revoke_api_key(
-        org_id: UUID, tenant_id: UUID, api_key_id: UUID
-    ) -> None:
+    async def revoke_api_key(org_id: UUID, tenant_id: UUID, api_key_id: UUID) -> None:
         async with get_db_session() as db_session:
             grace_period_minutes = get_settings().project.grace_period_mins
             grace_period = datetime.now(timezone.utc) + timedelta(

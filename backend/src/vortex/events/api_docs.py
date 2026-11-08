@@ -4,7 +4,6 @@ import msgspec
 
 from .schemas import EventIngestionBatch
 
-
 EVENTS_OPENAPI_EXTRA = {
     "requestBody": {
         "required": True,

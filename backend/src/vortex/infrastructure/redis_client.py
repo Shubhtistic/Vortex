@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+
 # --- globals ---
 class RedisPoolSaturatedError(RedisConnectionError):
     """Raised when Redis pool checkout times out, distinct from Redis being down."""

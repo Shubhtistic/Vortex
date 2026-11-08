@@ -249,7 +249,9 @@ async def _verify_using_cache_and_db(
             if not rejected:
                 now = datetime.now(timezone.utc)
                 if api_key_row.grace_expires_at is not None:
-                    remaining = int((api_key_row.grace_expires_at - now).total_seconds())
+                    remaining = int(
+                        (api_key_row.grace_expires_at - now).total_seconds()
+                    )
                     if remaining <= 0:
                         await ApiKeyRepository.set_as_revoked(
                             hashed_key=hashed_key,
@@ -260,7 +262,9 @@ async def _verify_using_cache_and_db(
                         cache_ttl = REVOKED_KEY_TTL + random.randint(-30, 30)
                         rejected = True
                     else:
-                        payload = _api_key_payload(api_key_row, ApiKeyStatus.grace_period)
+                        payload = _api_key_payload(
+                            api_key_row, ApiKeyStatus.grace_period
+                        )
                         cache_ttl = remaining
                 else:
                     payload = _api_key_payload(api_key_row, ApiKeyStatus.active)
