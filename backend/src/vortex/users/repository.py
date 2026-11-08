@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import User
-from src.vortex.shared.database import (
+from src.vortex.infrastructure.database import (
     check_exists,
     create,
     get_all,

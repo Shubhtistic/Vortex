@@ -4,7 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.shared.database import get_db_session
+from src.vortex.infrastructure.database import get_db_session
 from src.vortex.users.schemas import UserResponse
 
 from .models import User

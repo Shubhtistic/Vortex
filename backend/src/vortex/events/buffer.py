@@ -7,8 +7,8 @@ from collections.abc import Sequence
 import msgspec
 from fastapi import HTTPException, status
 
-from src.vortex.shared.config import get_settings
-from src.vortex.shared.redpanda_client import RedpandaProducer
+from src.vortex.infrastructure.config import get_settings
+from src.vortex.infrastructure.redpanda_client import RedpandaProducer
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

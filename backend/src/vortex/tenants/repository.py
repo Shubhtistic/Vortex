@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.shared.database import create, check_exists, execute_query
+from src.vortex.infrastructure.database import create, check_exists, execute_query
 
 from .enums import ApiKeyStatus, TenantStatus
 from .models import ApiKey, Tenant

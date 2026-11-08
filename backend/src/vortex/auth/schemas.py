@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from src.vortex.shared.utilities import reject_blank_text
+from src.vortex.api.validation import reject_blank_text
 
 
 class LoginRequest(BaseModel):

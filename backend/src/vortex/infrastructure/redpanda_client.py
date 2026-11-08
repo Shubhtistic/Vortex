@@ -8,8 +8,7 @@ from aiokafka.errors import KafkaConnectionError as RedpandaConnectionError
 from aiokafka.errors import KafkaError as RedpandaClientError
 from aiokafka.helpers import create_ssl_context as create_redpanda_ssl_context
 
-from src.vortex.shared.exceptions import RedpandaNotStartedError, RedpandaPublishError
-from src.vortex.shared.config import get_settings
+from src.vortex.infrastructure.config import get_settings
 
 # Why we dont need batching now with redpanda
 
@@ -23,6 +22,14 @@ from src.vortex.shared.config import get_settings
 # Redpanda producer
 _redpanda_producer: Optional[RedpandaAsyncProducer] = None
 _lifecycle_lock = asyncio.Lock()
+
+class RedpandaNotStartedError(RuntimeError):
+    """Raised when a message is published before the producer starts."""
+
+
+class RedpandaPublishError(RuntimeError):
+    """Raised when a Redpanda message cannot be serialized or published."""
+
 
 logger = logging.getLogger(__name__)
 

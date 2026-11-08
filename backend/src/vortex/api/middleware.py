@@ -4,7 +4,7 @@ import time
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.vortex.shared.config import get_settings
+from src.vortex.infrastructure.config import get_settings
 
 logger = logging.getLogger("app.request")
 

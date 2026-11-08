@@ -112,7 +112,7 @@ services:
     build:
       context: .
       target: runtime
-    command: ["python", "-m", "src.vortex.event_processor"]
+    command: ["python", "-m", "src.vortex.worker"]
     restart: unless-stopped
     scale: 3
     cpus: "1"

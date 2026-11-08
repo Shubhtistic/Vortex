@@ -6,13 +6,13 @@ from scalar_fastapi import get_scalar_api_reference
 from fastapi import FastAPI, HTTPException, Request
 from granian.utils.proxies import wrap_asgi_with_proxy_headers
 
-from src.vortex.shared.middleware import CORSMiddlewareWithSettings, log_requests
-from src.vortex.shared.redpanda_client import RedpandaProducer
-from src.vortex.shared.responses import ApiResponse
-from src.vortex.shared.redis_client import init_redis, close_redis
+from src.vortex.api.middleware import CORSMiddlewareWithSettings, log_requests
+from src.vortex.infrastructure.redpanda_client import RedpandaProducer
+from src.vortex.api.responses import ApiResponse
+from src.vortex.infrastructure.redis_client import init_redis, close_redis
 from src.vortex.api.routers import router as api_router
-from src.vortex.shared.logging_config import setup_logging
-from src.vortex.shared.config import get_settings
+from src.vortex.infrastructure.logging_config import setup_logging
+from src.vortex.infrastructure.config import get_settings
 from src.vortex.events.buffer import start_event_buffer, stop_event_buffer
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import msgspec
 from fastapi import APIRouter, HTTPException, Request, status
 
 from src.vortex.tenants.dependencies import VerifyApiKeyDep
-from src.vortex.shared.responses import ApiResponse
+from src.vortex.api.responses import ApiResponse
 
 from .api_docs import EVENTS_OPENAPI_EXTRA
 from .buffer import enqueue_events

@@ -4,8 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.shared.config import get_settings
-from src.vortex.shared.database import get_db_session
+from src.vortex.infrastructure.config import get_settings
+from src.vortex.infrastructure.database import get_db_session
 
 from .utils import create_api_key, hash_api_key, remove_api_key_from_cache
 from .exceptions import (

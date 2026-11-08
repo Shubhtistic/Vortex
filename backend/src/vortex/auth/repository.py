@@ -4,8 +4,8 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.shared.database import create, execute_query, get_one_by_query
-from src.vortex.shared.redis_client import get_redis
+from src.vortex.infrastructure.database import create, execute_query, get_one_by_query
+from src.vortex.infrastructure.redis_client import get_redis
 
 from .models import RefreshTokens
 

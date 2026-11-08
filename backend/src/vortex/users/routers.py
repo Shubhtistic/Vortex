@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from src.vortex.shared.responses import ApiResponse
+from src.vortex.api.responses import ApiResponse
 from src.vortex.auth.dependencies import CurrentUserDep
 
 from .services import UserService

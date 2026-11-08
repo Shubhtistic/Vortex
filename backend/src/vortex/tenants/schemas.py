@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from src.vortex.shared.utilities import reject_blank_text
+from src.vortex.api.validation import reject_blank_text
 
 from .enums import ApiKeyStatus, TenantStatus
 

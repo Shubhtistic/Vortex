@@ -15,10 +15,10 @@ from redis.exceptions import (
 )
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.vortex.shared.database import get_db_session
+from src.vortex.infrastructure.database import get_db_session
 
-from src.vortex.shared.config import get_settings
-from src.vortex.shared.redis_client import RedisPoolSaturatedError, get_redis
+from src.vortex.infrastructure.config import get_settings
+from src.vortex.infrastructure.redis_client import RedisPoolSaturatedError, get_redis
 
 from .models import ApiKeyStatus
 from .repository import ApiKeyRepository

@@ -9,10 +9,10 @@ import msgspec
 from sqlalchemy.exc import DataError as DatabaseDataError
 from sqlalchemy.exc import IntegrityError as DatabaseIntegrityError
 
-from src.vortex.shared.config import get_settings
-from src.vortex.shared.database import SessionFactory
-from src.vortex.shared.exceptions import InvalidEventError
-from src.vortex.shared.redpanda_client import RedpandaProducer
+from src.vortex.infrastructure.config import get_settings
+from src.vortex.infrastructure.database import SessionFactory
+from src.vortex.events.exceptions import InvalidEventError
+from src.vortex.infrastructure.redpanda_client import RedpandaProducer
 
 from .schemas import EventIngestionSchema
 from .services import EventService, invalid_identify_indexes

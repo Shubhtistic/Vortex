@@ -3,7 +3,7 @@ from uuid import uuid7
 import jwt as pyjwt
 
 from .exceptions import ExpiredSignatureError, InvalidTokenError, UnexpectedJwtError
-from src.vortex.shared.config import get_settings
+from src.vortex.infrastructure.config import get_settings
 
 # TTL / algorithm are set via env variables in settings
 

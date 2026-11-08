@@ -11,7 +11,7 @@ from .schemas import (
 )
 from src.vortex.users.services import UserService
 from src.vortex.auth.password import hash_password
-from src.vortex.shared.database import get_db_session
+from src.vortex.infrastructure.database import get_db_session
 from .models import Organization, OrganizationMembership
 from .enums import InviteMembershipRole, MembershipRole
 from .repository import OrganizationRepository, MembershipRepository

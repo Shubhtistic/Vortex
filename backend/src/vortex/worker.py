@@ -11,9 +11,9 @@ from aiokafka.structs import (
     TopicPartition as RedpandaTopicPartition,
 )
 
-from src.vortex.shared.config import get_settings
-from src.vortex.shared.database import db_engine
-from src.vortex.shared.redpanda_client import RedpandaProducer
+from src.vortex.infrastructure.config import get_settings
+from src.vortex.infrastructure.database import db_engine
+from src.vortex.infrastructure.redpanda_client import RedpandaProducer
 
 from src.vortex.events.record_processor import persist_records
 

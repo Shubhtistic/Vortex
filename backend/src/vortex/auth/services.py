@@ -5,7 +5,7 @@ from typing import Any, Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.shared.database import get_db_session
+from src.vortex.infrastructure.database import get_db_session
 from src.vortex.users.services import UserService
 from src.vortex.users.exceptions import UserNotFoundError
 from src.vortex.organizations.services import OrganizationService, MembershipService

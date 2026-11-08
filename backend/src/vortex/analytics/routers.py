@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from src.vortex.auth.dependencies import CurrentUserDep
-from src.vortex.shared.responses import ApiResponse
+from src.vortex.api.responses import ApiResponse
 
 from .schemas import AnalyticsFilters
 from .services import AnalyticsService

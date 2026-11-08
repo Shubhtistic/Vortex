@@ -1,5 +1,7 @@
 import asyncio
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -7,8 +9,11 @@ from alembic import context
 
 # --- imports models ---
 from sqlmodel import SQLModel
-from src.vortex.shared.db_registry import *
-from src.vortex.shared.config import get_settings
+
+# Alembic loads env.py as a script, so add this directory to import its registry.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from model_registry import *
+from src.vortex.infrastructure.config import get_settings
 
 config = context.config
 

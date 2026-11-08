@@ -5,7 +5,7 @@ from sqlalchemy import and_, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.vortex.events.models import Event
-from src.vortex.shared.database import execute_query
+from src.vortex.infrastructure.database import execute_query
 
 
 class AnalyticsRepository:

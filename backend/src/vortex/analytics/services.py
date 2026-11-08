@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.vortex.shared.database import get_db_session
+from src.vortex.infrastructure.database import get_db_session
 from .repository import AnalyticsRepository
 from .schemas import (
     ActiveUsersPoint,

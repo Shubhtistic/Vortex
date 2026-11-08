@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlmodel import SQLModel
 
-from src.vortex.shared.config import get_settings
+from src.vortex.infrastructure.config import get_settings
 
 # --- settings ---
 settings = get_settings()

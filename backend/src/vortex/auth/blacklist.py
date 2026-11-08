@@ -1,4 +1,4 @@
-from src.vortex.shared.redis_client import get_redis
+from src.vortex.infrastructure.redis_client import get_redis
 
 
 async def blacklist_token(jti: str, ttl_seconds: int) -> None:
