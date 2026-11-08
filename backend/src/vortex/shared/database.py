@@ -1,6 +1,7 @@
-from typing import Annotated, TypeVar
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import TypeVar
 
-from fastapi import Depends
 from sqlalchemy import Select, delete, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -38,26 +39,13 @@ SessionFactory = async_sessionmaker(
 )
 
 
-# --- fastapi db dependancy ---
-async def get_db_session():
-    """Yield a request-scoped session; auto-rollback on unhandled exception."""
+# --- transaction context ---
+@asynccontextmanager
+async def get_db_session() -> AsyncGenerator[AsyncSession]:
+    """Open one session and transaction for an application operation."""
     async with SessionFactory() as db_session:
-        try:
+        async with db_session.begin():
             yield db_session
-            await db_session.commit()
-        except Exception:
-            await db_session.rollback()
-            raise
-
-
-def get_session_factory():
-    return SessionFactory
-
-
-# --- Annotated Dep ---
-DbSessionDep = Annotated[
-    AsyncSession, Depends(get_db_session, scope="function")
-]
 
 
 # --- CRUD Utils ---

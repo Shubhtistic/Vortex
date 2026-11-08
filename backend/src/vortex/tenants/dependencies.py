@@ -15,7 +15,7 @@ from redis.exceptions import (
 )
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.vortex.shared.database import get_session_factory
+from src.vortex.shared.database import get_db_session
 
 from src.vortex.shared.config import get_settings
 from src.vortex.shared.redis_client import RedisPoolSaturatedError, get_redis
@@ -224,9 +224,7 @@ async def _verify_using_cache_and_db(
         # cache not found
         # now we will set it
 
-        session_factory = get_session_factory()
-        async with session_factory() as db_session:
-
+        async with get_db_session() as db_session:
             api_key_row = await _get_from_db(hashed_key, db_session)
 
             # check if api exists or is correct
@@ -239,91 +237,48 @@ async def _verify_using_cache_and_db(
                     detail="Invalid API key",
                 )
 
-            # process now
+            # Resolve database state before touching the cache. Expired grace keys
+            # must commit their revocation before the 401 is raised.
             if api_key_row.status == ApiKeyStatus.revoked:
-                logger.warning("API key authentication failed: key revoked")
+                payload = _api_key_payload(api_key_row, ApiKeyStatus.revoked)
+                cache_ttl = REVOKED_KEY_TTL + random.randint(-30, 30)
+                rejected = True
+            else:
+                rejected = False
 
-                # value
-                value = {
-                    "status": ApiKeyStatus.revoked.value,
-                    "api_key_id": str(api_key_row.id),
-                    "tenant_id": str(api_key_row.tenant_id),
-                    "organization_id": str(api_key_row.organization_id),
-                }
-
-                # expiry with jitter
-                ex = REVOKED_KEY_TTL + random.randint(-30, 30)
-
-                # set the cache
-                await redis.set(cache_key, orjson.dumps(value), ex=ex)
-
-                # return response
-                raise HTTPException(status_code=401, detail="API key revoked")
-
-            # current_time
-            now = datetime.now(timezone.utc)
-
-            if api_key_row.grace_expires_at is not None:
-                remaining = int((api_key_row.grace_expires_at - now).total_seconds())
-                if remaining <= 0:
-                    await ApiKeyRepository.set_as_revoked(
-                        hashed_key=hashed_key, revoked_at=now, db_session=db_session
-                    )
-                    
-                    await db_session.commit()
-                    payload = {
-                        "status": ApiKeyStatus.revoked.value,  # FIX: was enum object
-                        "api_key_id": str(api_key_row.id),
-                        "tenant_id": str(api_key_row.tenant_id),
-                        "organization_id": str(api_key_row.organization_id),
-                    }
-
-                    # expiry with jitter
-                    ex = REVOKED_KEY_TTL + random.randint(-30, 30)
-
-                    await redis.set(cache_key, orjson.dumps(payload), ex=ex)
-                    raise HTTPException(
-                        status_code=http_status.HTTP_401_UNAUTHORIZED,
-                        detail="API key revoked",
-                    )
-
-                # grace period still remains
+            if not rejected:
+                now = datetime.now(timezone.utc)
+                if api_key_row.grace_expires_at is not None:
+                    remaining = int((api_key_row.grace_expires_at - now).total_seconds())
+                    if remaining <= 0:
+                        await ApiKeyRepository.set_as_revoked(
+                            hashed_key=hashed_key,
+                            revoked_at=now,
+                            db_session=db_session,
+                        )
+                        payload = _api_key_payload(api_key_row, ApiKeyStatus.revoked)
+                        cache_ttl = REVOKED_KEY_TTL + random.randint(-30, 30)
+                        rejected = True
+                    else:
+                        payload = _api_key_payload(api_key_row, ApiKeyStatus.grace_period)
+                        cache_ttl = remaining
                 else:
-                    logger.info("API key accepted during grace period")
-                    payload = {
-                        "status": ApiKeyStatus.grace_period.value,
-                        "api_key_id": str(api_key_row.id),
-                        "tenant_id": str(api_key_row.tenant_id),
-                        "organization_id": str(api_key_row.organization_id),
-                    }
-                    await redis.set(cache_key, orjson.dumps(payload), ex=remaining)
+                    payload = _api_key_payload(api_key_row, ApiKeyStatus.active)
+                    cache_ttl = ACTIVE_KEY_TTL + random.randint(-30, 30)
 
-                    return payload
-
-            # key is activ
-            payload = {
-                "status": ApiKeyStatus.active.value,
-                "api_key_id": str(api_key_row.id),
-                "tenant_id": str(api_key_row.tenant_id),
-                "organization_id": str(api_key_row.organization_id),
-            }
-
-            # expiry with jitter
-
-            ex = ACTIVE_KEY_TTL + random.randint(-30, 30)
-
-            await redis.set(cache_key, orjson.dumps(payload), ex=ex)
-            logger.debug("API key accepted from database and cached")
-            return payload
+        await redis.set(cache_key, orjson.dumps(payload), ex=cache_ttl)
+        if rejected:
+            logger.warning("API key authentication failed: key revoked")
+            raise HTTPException(status_code=401, detail="API key revoked")
+        logger.debug("API key accepted from database and cached")
+        return payload
 
 
 async def verify_with_db_only(hashed_key: str):
     """this fetches the db directly for each request if redis is down"""
 
-    session_factory = get_session_factory()
-    async with session_factory() as db_session:
-
-        try:
+    try:
+        async with get_db_session() as db_session:
             api_key_row = await _get_from_db(
                 hashed_key=hashed_key, db_session=db_session
             )
@@ -337,9 +292,7 @@ async def verify_with_db_only(hashed_key: str):
                     detail="Invalid API key",
                 )
 
-            # process now
             if api_key_row.status == ApiKeyStatus.revoked:
-                # return response
                 raise HTTPException(status_code=401, detail="API key revoked")
 
             now = datetime.now(timezone.utc)
@@ -350,37 +303,34 @@ async def verify_with_db_only(hashed_key: str):
                     await ApiKeyRepository.set_as_revoked(
                         hashed_key=hashed_key, revoked_at=now, db_session=db_session
                     )
-
-                    await db_session.commit()
-
-                    raise HTTPException(
-                        status_code=http_status.HTTP_401_UNAUTHORIZED,
-                        detail="API key revoked",
-                    )
-
-                # grace period still remains
+                    payload = _api_key_payload(api_key_row, ApiKeyStatus.revoked)
+                    rejected = True
                 else:
-                    payload = {
-                        "status": ApiKeyStatus.grace_period.value,
-                        "api_key_id": str(api_key_row.id),
-                        "tenant_id": str(api_key_row.tenant_id),
-                        "organization_id": str(api_key_row.organization_id),
-                    }
+                    payload = _api_key_payload(api_key_row, ApiKeyStatus.grace_period)
+                    rejected = False
+            else:
+                payload = _api_key_payload(api_key_row, ApiKeyStatus.active)
+                rejected = False
+    except OperationalError:
+        raise HTTPException(
+            status_code=503, detail="We Are Currently Facing Some issues"
+        )
 
-                    return payload
+    if rejected:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="API key revoked",
+        )
+    return payload
 
-            payload = {
-                "status": ApiKeyStatus.active.value,
-                "api_key_id": str(api_key_row.id),
-                "tenant_id": str(api_key_row.tenant_id),
-                "organization_id": str(api_key_row.organization_id),
-            }
-            return payload
 
-        except OperationalError:
-            raise HTTPException(
-                status_code=503, detail="We Are Currently Facing Some issues"
-            )
+def _api_key_payload(api_key_row, status: ApiKeyStatus) -> dict:
+    return {
+        "status": status.value,
+        "api_key_id": str(api_key_row.id),
+        "tenant_id": str(api_key_row.tenant_id),
+        "organization_id": str(api_key_row.organization_id),
+    }
 
 
 async def _get_from_db(hashed_key: str, db_session: AsyncSession) -> dict:

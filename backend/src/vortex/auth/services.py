@@ -5,6 +5,7 @@ from typing import Any, Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.vortex.shared.database import get_db_session
 from src.vortex.users.services import UserService
 from src.vortex.users.exceptions import UserNotFoundError
 from src.vortex.organizations.services import OrganizationService, MembershipService
@@ -31,6 +32,18 @@ logger = logging.getLogger(__name__)
 class AuthService:
     @staticmethod
     async def login(
+        org_slug: str, email: str, plain_password: str
+    ) -> tuple[str, str]:
+        async with get_db_session() as db_session:
+            return await AuthService._login(
+                db_session=db_session,
+                org_slug=org_slug,
+                email=email,
+                plain_password=plain_password,
+            )
+
+    @staticmethod
+    async def _login(
         db_session: AsyncSession, org_slug: str, email: str, plain_password: str
     ) -> tuple[str, str]:
         # step 1 -> Organization table: slug -> org_id
@@ -75,10 +88,18 @@ class AuthService:
 
     @staticmethod
     async def refresh(
-        db_session: AsyncSession, raw_refresh_token: str
+        raw_refresh_token: str
     ) -> tuple[str, str, datetime]:
         """try to rotate a refresh token and if succeeds send (access_token, refresh_token)"""
+        async with get_db_session() as db_session:
+            return await AuthService._refresh(
+                db_session=db_session, raw_refresh_token=raw_refresh_token
+            )
 
+    @staticmethod
+    async def _refresh(
+        db_session: AsyncSession, raw_refresh_token: str
+    ) -> tuple[str, str, datetime]:
         # exceptions will be raised, let router catch them
         raw_refresh_token, membership, max_window_limit = (
             await RefreshTokenService.rotate(
@@ -96,26 +117,24 @@ class AuthService:
 
     @staticmethod
     async def logout(
-        db_session: AsyncSession,
         raw_refresh_token: Optional[str] = None,
         jti: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
     ):
+        async with get_db_session() as db_session:
+            if raw_refresh_token:
+                await RefreshTokenRepository.revoke(
+                    db_session=db_session,
+                    hashed_token=RefreshTokenService.hash_token(raw_refresh_token),
+                    revoked_at=datetime.now(timezone.utc),
+                )
 
-        # set the refresh token as revoked
-        if raw_refresh_token:
-            await RefreshTokenRepository.revoke(
-                db_session=db_session,
-                hashed_token=RefreshTokenService.hash_token(raw_refresh_token),
-                revoked_at=datetime.now(timezone.utc),
-            )
+            if jti and ttl_seconds:
+                await JwtRepository.add_jti_to_blacklist(
+                    jti=jti, ttl_seconds=ttl_seconds
+                )
 
-        # set the jwt as blacklisted
-        if jti and ttl_seconds:
-            await JwtRepository.add_jti_to_blacklist(jti=jti, ttl_seconds=ttl_seconds)
-
-        logger.info("Logout service operation completed")
-        return None
+            logger.info("Logout service operation completed")
 
 
 class RefreshTokenService:

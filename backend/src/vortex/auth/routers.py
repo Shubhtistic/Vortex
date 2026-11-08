@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Cookie, Response
 
 from src.vortex.shared.schemas import ApiResponseSchema
-from src.vortex.shared.database import DbSessionDep
 from src.vortex.shared.responses import ApiResponse
 
 from .dependencies import OptionalUserDep
@@ -22,11 +21,10 @@ REFRESH_COOKIE_PATH = "/auth"
 
 
 @router.post("/login")
-async def login(payload: LoginRequest, db_session: DbSessionDep, response: Response):
+async def login(payload: LoginRequest, response: Response):
 
     try:
         access_token, raw_refresh_token = await AuthService.login(
-            db_session=db_session,
             org_slug=payload.org_slug,
             email=payload.email,
             plain_password=payload.password,
@@ -54,7 +52,6 @@ async def login(payload: LoginRequest, db_session: DbSessionDep, response: Respo
 @router.post("/refresh")
 async def refresh(
     response: Response,
-    db_session: DbSessionDep,
     refresh_token: str | None = Cookie(default=None, alias="refresh_token"),
 ):
     if refresh_token is None:
@@ -62,9 +59,7 @@ async def refresh(
 
     try:
         access_token, new_raw_refresh_token, max_window_limit = (
-            await AuthService.refresh(
-                db_session=db_session, raw_refresh_token=refresh_token
-            )
+            await AuthService.refresh(raw_refresh_token=refresh_token)
         )
     except (
         RefreshTokenNotFoundError,
@@ -103,7 +98,6 @@ async def refresh(
 @router.post("/logout", status_code=204)
 async def logout(
     response: Response,
-    db_session: DbSessionDep,
     optional_user_data: OptionalUserDep,
     refresh_token: str | None = Cookie(default=None, alias="refresh_token"),
 ):
@@ -118,7 +112,6 @@ async def logout(
     ttl_seconds = exp - int(datetime.now(timezone.utc).timestamp()) if exp else None
 
     await AuthService.logout(
-        db_session=db_session,
         raw_refresh_token=refresh_token,
         jti=jti,
         ttl_seconds=ttl_seconds,

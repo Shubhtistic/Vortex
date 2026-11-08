@@ -11,6 +11,7 @@ from .schemas import (
 )
 from src.vortex.users.services import UserService
 from src.vortex.auth.password import hash_password
+from src.vortex.shared.database import get_db_session
 from .models import Organization, OrganizationMembership
 from .enums import InviteMembershipRole, MembershipRole
 from .repository import OrganizationRepository, MembershipRepository
@@ -28,90 +29,84 @@ logger = logging.getLogger(__name__)
 
 class OrganizationService:
     @staticmethod
-    async def signup(
-        db_session: AsyncSession,
-        signup_data: SignupRequest,
-    ) -> dict:
+    async def signup(signup_data: SignupRequest) -> dict:
+        async with get_db_session() as db_session:
+            if await OrganizationRepository.check_by_slug(
+                db_session=db_session, slug=signup_data.slug
+            ):
+                raise OrganizationAlreadyExistsError(slug=signup_data.slug)
 
-        # step 1 -> slug must be free
-        if await OrganizationRepository.check_by_slug(
-            db_session=db_session, slug=signup_data.slug
-        ):
-            raise OrganizationAlreadyExistsError(slug=signup_data.slug)
+            org = await OrganizationRepository.create_organization(
+                db_session=db_session,
+                instance=Organization(
+                    name=signup_data.org_name, slug=signup_data.slug
+                ),
+            )
 
-        # org slug is free
-        org = await OrganizationRepository.create_organization(
-            db_session=db_session,
-            instance=Organization(name=signup_data.org_name, slug=signup_data.slug),
-        )
+            user = await UserService.create_user(
+                db_session=db_session,
+                user_data={
+                    "email": signup_data.email,
+                    "hashed_password": hash_password(signup_data.password),
+                    "first_name": signup_data.first_name,
+                    "last_name": signup_data.last_name,
+                },
+            )
 
-        # create an user -> email should not exist anywhere as any role (superuser / admin , etc)
-        # !! send hashed password
-        user = await UserService.create_user(
-            db_session=db_session,
-            user_data={
-                "email": signup_data.email,
-                "hashed_password": hash_password(signup_data.password),
-                "first_name": signup_data.first_name,
-                "last_name": signup_data.last_name,
-            },
-        )
-        # raises useralreadyexists exception, let it propagate router will catch it
-
-        membership = await MembershipRepository.create_membership(
-            db_session=db_session,
-            instance=OrganizationMembership(
-                organization_id=org.id, user_id=user.id, role=MembershipRole.owner
-            ),
-        )
-        logger.info("Organization signup completed")
-        # return Membership Orm Object
-        return MembershipRead.model_validate(membership).model_dump()
+            membership = await MembershipRepository.create_membership(
+                db_session=db_session,
+                instance=OrganizationMembership(
+                    organization_id=org.id,
+                    user_id=user.id,
+                    role=MembershipRole.owner,
+                ),
+            )
+            logger.info("Organization signup completed")
+            return MembershipRead.model_validate(membership).model_dump()
 
     @staticmethod
     async def invite_member(
-        db_session: AsyncSession,
         payload: InviteMemberRequest,
         org_id: UUID,
         invited_by_user_id: UUID,
     ) -> dict:
-
-        target_user = await UserService.find_by_email(
-            db_session=db_session, email=payload.email
-        )
-
-        if target_user is None:
-            target_user = await UserService.create_user(
-                db_session=db_session,
-                user_data={
-                    "email": payload.email,
-                    "hashed_password": hash_password(payload.password),
-                    "first_name": payload.first_name,
-                    "last_name": payload.last_name,
-                },
+        async with get_db_session() as db_session:
+            target_user = await UserService.find_by_email(
+                db_session=db_session, email=payload.email
             )
-        else:
-            if await MembershipRepository.has_active_owner_membership(
-                db_session=db_session, user_id=target_user.id
-            ):
-                raise CannotInviteRootAccountError(email=payload.email)
 
-            if await MembershipRepository.get_active_membership(
+            if target_user is None:
+                target_user = await UserService.create_user(
+                    db_session=db_session,
+                    user_data={
+                        "email": payload.email,
+                        "hashed_password": hash_password(payload.password),
+                        "first_name": payload.first_name,
+                        "last_name": payload.last_name,
+                    },
+                )
+            else:
+                if await MembershipRepository.has_active_owner_membership(
+                    db_session=db_session, user_id=target_user.id
+                ):
+                    raise CannotInviteRootAccountError(email=payload.email)
+
+                if await MembershipRepository.get_active_membership(
+                    db_session=db_session,
+                    org_id=org_id,
+                    user_id=target_user.id,
+                ):
+                    raise UserAlreadyMemberError(org_id=org_id, email=payload.email)
+
+            new_membership = await MembershipService.create_membership(
                 db_session=db_session,
-                org_id=org_id,
+                organization_id=org_id,
                 user_id=target_user.id,
-            ):
-                raise UserAlreadyMemberError(org_id=org_id, email=payload.email)
-
-        new_membership = await MembershipService.create_membership(
-            db_session=db_session,
-            organization_id=org_id,
-            user_id=target_user.id,
-            role=payload.role,
-            invited_by_user_id=invited_by_user_id,
-        )
-        logger.info("Organization member invitation completed")
-        return MembershipRead.model_validate(new_membership).model_dump()
+                role=payload.role,
+                invited_by_user_id=invited_by_user_id,
+            )
+            logger.info("Organization member invitation completed")
+            return MembershipRead.model_validate(new_membership).model_dump()
 
     @staticmethod
     async def get_by_slug(db_session: AsyncSession, slug: str) -> Organization:
@@ -122,19 +117,29 @@ class OrganizationService:
         return org
 
     @staticmethod
-    async def get_org_info_by_id(org_id: UUID, db_session: AsyncSession) -> dict:
-        org = await OrganizationRepository.get_org_by_id(
-            org_id=org_id, db_session=db_session
-        )
-        if not org:
-            logger.warning("Organization lookup failed: organization not found")
-            raise OrganizationNotFoundError(identifier=str(org_id))
+    async def get_org_info_by_id(org_id: UUID) -> dict:
+        async with get_db_session() as db_session:
+            org = await OrganizationRepository.get_org_by_id(
+                org_id=org_id, db_session=db_session
+            )
+            if not org:
+                logger.warning("Organization lookup failed: organization not found")
+                raise OrganizationNotFoundError(identifier=str(org_id))
 
-        logger.info("Organization details fetched")
-        return OrganizationResponse.model_validate(org).model_dump()
+            logger.info("Organization details fetched")
+            return OrganizationResponse.model_validate(org).model_dump()
 
 
 class MembershipService:
+    @staticmethod
+    async def get_membership_for_auth(
+        org_id: UUID, user_id: UUID
+    ) -> OrganizationMembership | None:
+        async with get_db_session() as db_session:
+            return await MembershipRepository.get_active_membership(
+                db_session=db_session, org_id=org_id, user_id=user_id
+            )
+
     @staticmethod
     async def create_membership(
         db_session: AsyncSession,
@@ -171,43 +176,47 @@ class MembershipService:
 
     @staticmethod
     async def get_all_active_org_members(
-        org_id: UUID, db_session: AsyncSession, limit: int, page_num: int
+        org_id: UUID, limit: int, page_num: int
     ) -> tuple[list[dict], int]:
-        offset = (page_num - 1) * limit
+        async with get_db_session() as db_session:
+            offset = (page_num - 1) * limit
 
-        memberships, total_count = await MembershipRepository.get_all_active_members(
-            org_id, db_session, offset, limit
-        )
-        if not total_count:
-            logger.debug("No active organization members found")
-            return [], 0
+            memberships, total_count = (
+                await MembershipRepository.get_all_active_members(
+                    org_id, db_session, offset, limit
+                )
+            )
+            if not total_count:
+                logger.debug("No active organization members found")
+                return [], 0
 
-        users_by_id = await UserService.get_users_by_ids(
-            db_session=db_session, user_ids=[m.user_id for m in memberships]
-        )
+            users_by_id = await UserService.get_users_by_ids(
+                db_session=db_session, user_ids=[m.user_id for m in memberships]
+            )
 
-        data = [
-            OrgMemberRead(
-                user_id=m.user_id,
-                role=m.role,
-                email=users_by_id[m.user_id].email,
-                first_name=users_by_id[m.user_id].first_name,
-                last_name=users_by_id[m.user_id].last_name,
-            ).model_dump()
-            for m in memberships
-            if m.user_id in users_by_id
-        ]
-        return data, total_count
+            data = [
+                OrgMemberRead(
+                    user_id=m.user_id,
+                    role=m.role,
+                    email=users_by_id[m.user_id].email,
+                    first_name=users_by_id[m.user_id].first_name,
+                    last_name=users_by_id[m.user_id].last_name,
+                ).model_dump()
+                for m in memberships
+                if m.user_id in users_by_id
+            ]
+            return data, total_count
 
     @staticmethod
     async def deactivate_member(
-        db_session: AsyncSession, org_id: UUID, target_user_id: UUID
+        org_id: UUID, target_user_id: UUID
     ) -> UUID | None:
-        if deleted_id := await MembershipRepository.deactivate_member(
-            db_session=db_session, org_id=org_id, user_id=target_user_id
-        ):
-            logger.info("Organization membership deactivated")
-            return deleted_id
+        async with get_db_session() as db_session:
+            if deleted_id := await MembershipRepository.deactivate_member(
+                db_session=db_session, org_id=org_id, user_id=target_user_id
+            ):
+                logger.info("Organization membership deactivated")
+                return deleted_id
 
-        logger.warning("Organization membership deactivation failed")
-        raise UserCannotBeDeletedError
+            logger.warning("Organization membership deactivation failed")
+            raise UserCannotBeDeletedError

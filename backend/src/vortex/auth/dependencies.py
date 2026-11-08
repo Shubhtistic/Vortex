@@ -5,8 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.exc import OperationalError
 
-from src.vortex.shared.database import DbSessionDep
-from src.vortex.organizations.repository import MembershipRepository
+from src.vortex.organizations.services import MembershipService
 from src.vortex.organizations.enums import MembershipRole
 from .jwt import decode_and_verify_token
 from .exceptions import ExpiredSignatureError, InvalidTokenError, UnexpectedJwtError
@@ -51,7 +50,7 @@ async def optional_current_user_dep(
     return claims
 
 
-async def _get_verified_membership(current_user: dict, db_session: DbSessionDep):
+async def _get_verified_membership(current_user: dict):
     """Shared DB-verification step for tier 2 and tier 3 deps."""
     try:
         user_id = current_user["user_id"]
@@ -64,8 +63,8 @@ async def _get_verified_membership(current_user: dict, db_session: DbSessionDep)
         )
 
     try:
-        membership = await MembershipRepository.get_active_membership(
-            db_session=db_session, org_id=org_id, user_id=user_id
+        membership = await MembershipService.get_membership_for_auth(
+            org_id=org_id, user_id=user_id
         )
     except OperationalError:
         logger.exception("Membership verification database unavailable")
@@ -86,10 +85,9 @@ async def _get_verified_membership(current_user: dict, db_session: DbSessionDep)
 
 async def verified_admin_dep(
     current_user: Annotated[dict, Depends(current_user_dep)],
-    db_session: DbSessionDep,
 ) -> dict:
     """Tier 2 — DB-verified. Allows admin or owner"""
-    membership = await _get_verified_membership(current_user, db_session)
+    membership = await _get_verified_membership(current_user)
 
     if membership.role not in (MembershipRole.admin, MembershipRole.owner):
         logger.warning("Admin authorization failed")
@@ -102,11 +100,10 @@ async def verified_admin_dep(
 
 async def verified_owner_dep(
     current_user: Annotated[dict, Depends(current_user_dep)],
-    db_session: DbSessionDep,
 ) -> dict:
     """Tier 3 -> owner only"""
 
-    membership = await _get_verified_membership(current_user, db_session)
+    membership = await _get_verified_membership(current_user)
 
     if membership.role != MembershipRole.owner:
         logger.warning("Owner authorization failed")

@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.vortex.shared.database import get_db_session
 from .repository import AnalyticsRepository
 from .schemas import (
     ActiveUsersPoint,
@@ -56,7 +57,12 @@ class AnalyticsService:
         )
 
     @staticmethod
-    async def overview(
+    async def overview(organization_id: UUID, filters: AnalyticsFilters) -> dict:
+        async with get_db_session() as db_session:
+            return await AnalyticsService._overview(organization_id, filters, db_session)
+
+    @staticmethod
+    async def _overview(
         organization_id: UUID,
         filters: AnalyticsFilters,
         db_session: AsyncSession,
@@ -86,6 +92,15 @@ class AnalyticsService:
 
     @staticmethod
     async def timeseries(
+        organization_id: UUID, filters: AnalyticsFilters, interval: str
+    ) -> list[dict]:
+        async with get_db_session() as db_session:
+            return await AnalyticsService._timeseries(
+                organization_id, filters, interval, db_session
+            )
+
+    @staticmethod
+    async def _timeseries(
         organization_id: UUID,
         filters: AnalyticsFilters,
         interval: str,
@@ -108,6 +123,15 @@ class AnalyticsService:
 
     @staticmethod
     async def top_events(
+        organization_id: UUID, filters: AnalyticsFilters, limit: int
+    ) -> list[dict]:
+        async with get_db_session() as db_session:
+            return await AnalyticsService._top_events(
+                organization_id, filters, limit, db_session
+            )
+
+    @staticmethod
+    async def _top_events(
         organization_id: UUID,
         filters: AnalyticsFilters,
         limit: int,
@@ -130,6 +154,18 @@ class AnalyticsService:
 
     @staticmethod
     async def breakdown(
+        organization_id: UUID,
+        filters: AnalyticsFilters,
+        property_name: str,
+        limit: int,
+    ) -> list[dict]:
+        async with get_db_session() as db_session:
+            return await AnalyticsService._breakdown(
+                organization_id, filters, property_name, limit, db_session
+            )
+
+    @staticmethod
+    async def _breakdown(
         organization_id: UUID,
         filters: AnalyticsFilters,
         property_name: str,
@@ -160,6 +196,15 @@ class AnalyticsService:
 
     @staticmethod
     async def active_users(
+        organization_id: UUID, filters: AnalyticsFilters, interval: str
+    ) -> list[dict]:
+        async with get_db_session() as db_session:
+            return await AnalyticsService._active_users(
+                organization_id, filters, interval, db_session
+            )
+
+    @staticmethod
+    async def _active_users(
         organization_id: UUID,
         filters: AnalyticsFilters,
         interval: str,
@@ -184,6 +229,15 @@ class AnalyticsService:
 
     @staticmethod
     async def recent_events(
+        organization_id: UUID, filters: AnalyticsFilters, limit: int
+    ) -> list[dict]:
+        async with get_db_session() as db_session:
+            return await AnalyticsService._recent_events(
+                organization_id, filters, limit, db_session
+            )
+
+    @staticmethod
+    async def _recent_events(
         organization_id: UUID,
         filters: AnalyticsFilters,
         limit: int,

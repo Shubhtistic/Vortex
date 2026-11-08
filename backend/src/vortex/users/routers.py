@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from src.vortex.shared.responses import ApiResponse
 from src.vortex.auth.dependencies import CurrentUserDep
-from src.vortex.shared.database import DbSessionDep
 
 from .services import UserService
 from .exceptions import UserNotFoundError
@@ -15,12 +14,10 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get("/me")
-async def get_user_info(db_session: DbSessionDep, current_user: CurrentUserDep):
+async def get_user_info(current_user: CurrentUserDep):
 
     try:
-        data = await UserService.get_user_info_by_id(
-            current_user.get("user_id"), db_session=db_session
-        )
+        data = await UserService.get_user_info_by_id(current_user.get("user_id"))
     except UserNotFoundError:
         return ApiResponse.error(message="user not found", code=404)
 

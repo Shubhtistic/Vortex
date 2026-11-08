@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.vortex.shared.database import get_db_session
 from src.vortex.users.schemas import UserResponse
 
 from .models import User
@@ -60,13 +61,14 @@ class UserService:
         return {u.id: UserResponse.model_validate(u) for u in users}
 
     @staticmethod
-    async def get_user_info_by_id(user_id: UUID, db_session: AsyncSession) -> dict:
-        user = await UserRepository.get_user_by_id(
-            user_id=user_id, db_session=db_session
-        )
-        if not user:
-            logger.debug("User lookup by ID returned no active user")
-            raise UserNotFoundError(identifier=str(user_id))
+    async def get_user_info_by_id(user_id: UUID) -> dict:
+        async with get_db_session() as db_session:
+            user = await UserRepository.get_user_by_id(
+                user_id=user_id, db_session=db_session
+            )
+            if not user:
+                logger.debug("User lookup by ID returned no active user")
+                raise UserNotFoundError(identifier=str(user_id))
 
-        logger.info("User details fetched")
-        return UserResponse.model_validate(user).model_dump()
+            logger.info("User details fetched")
+            return UserResponse.model_validate(user).model_dump()
