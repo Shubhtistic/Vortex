@@ -269,6 +269,8 @@ async def _verify_using_cache_and_db(
                     await ApiKeyRepository.set_as_revoked(
                         hashed_key=hashed_key, revoked_at=now, db_session=db_session
                     )
+                    
+                    await db_session.commit()
                     payload = {
                         "status": ApiKeyStatus.revoked.value,  # FIX: was enum object
                         "api_key_id": str(api_key_row.id),
@@ -348,6 +350,8 @@ async def verify_with_db_only(hashed_key: str):
                     await ApiKeyRepository.set_as_revoked(
                         hashed_key=hashed_key, revoked_at=now, db_session=db_session
                     )
+
+                    await db_session.commit()
 
                     raise HTTPException(
                         status_code=http_status.HTTP_401_UNAUTHORIZED,
