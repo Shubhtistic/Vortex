@@ -18,7 +18,7 @@ The repository contains a **FastAPI backend** and a **Next.js frontend**. The ba
 
 ## Architecture
 
-The API acknowledges accepted events after publishing them to Redpanda. The separate event processor consumes the topic in batches, applies identity and group updates, writes to PostgreSQL in a transaction, then commits Redpanda offsets. Dashboard analytics read from the PostgreSQL event table through the analytics module.
+The API acknowledges events after they enter its bounded in-memory buffer; a background flush task publishes them to Redpanda. The separate event processor consumes the topic in batches, applies identity and group updates, writes to PostgreSQL in a transaction, then commits Redpanda offsets. Dashboard analytics read from the PostgreSQL event table through the analytics module.
 
 ```mermaid
 flowchart LR
@@ -60,11 +60,12 @@ backend/
 │   ├── organizations/   # Organization signup and memberships
 │   ├── tenants/         # Tenant and API key lifecycle
 │   ├── users/           # Signed-in user profile
-│   ├── shared/          # Settings, DB, Redis, Redpanda, middleware, responses
-│   ├── event_processor.py
-│   └── main.py          # FastAPI application entry point
+│   ├── infrastructure/  # Settings, DB, Redis, Redpanda, logging, repository helpers
+│   ├── api/             # Router aggregation, middleware, responses, validation
+│   ├── main.py          # FastAPI application entry point
+│   └── worker.py        # Redpanda consumer and event persistence entry point
 ├── alembic/             # Database schema revisions
-├── compose.yml          # PostgreSQL, Redis, migration, API, event processor
+├── compose.local.yml    # PostgreSQL, Redis, migration, API, Nginx, event processor
 └── compose.redpanda.yml # Local Redpanda broker
 frontend/
 ├── src/app/             # Public pages and authenticated dashboard routes
@@ -102,7 +103,7 @@ docker compose -p redpanda-local -f compose.redpanda.yml up -d
 Start PostgreSQL, Redis, the migration job, API, and event processor:
 
 ```bash
-docker compose up --build -d
+docker compose -f compose.local.yml up --build -d
 ```
 
 The API is available at [http://localhost:8000](http://localhost:8000). FastAPI's OpenAPI UI is at [http://localhost:8000/docs](http://localhost:8000/docs). The current app does not define a dedicated `/health` route.
@@ -110,7 +111,7 @@ The API is available at [http://localhost:8000](http://localhost:8000). FastAPI'
 To inspect application logs:
 
 ```bash
-docker compose logs -f fastapi event-processor
+docker compose -f compose.local.yml logs -f fastapi event-processor
 ```
 
 ### Start the frontend

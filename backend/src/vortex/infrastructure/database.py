@@ -35,6 +35,7 @@ SessionFactory = async_sessionmaker(
 
 # --- transaction context ---
 @asynccontextmanager
+# actual uow
 async def get_db_session() -> AsyncGenerator[AsyncSession]:
     """Open one session and transaction for an application operation."""
     async with SessionFactory() as db_session:

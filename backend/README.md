@@ -77,7 +77,8 @@ sequenceDiagram
 | `users` | Signed-in user's profile. |
 | `events` | Client event schema, five event-related tables, batch persistence repositories, and processing services. |
 | `analytics` | Read-only query endpoints and SQL over the `events` table; imports the event model without making the events module depend on analytics. |
-| `shared` | Settings, database session helpers, Redis, Redpanda producer, middleware, API response envelopes, and shared utilities. |
+| `infrastructure` | Settings, database engine/session helpers, Redis, Redpanda producer, logging, and repository helpers. |
+| `api` | Aggregate router, middleware, response envelope, and shared API validation. |
 
 The event tables are:
 
@@ -134,11 +135,11 @@ Analytics routes accept `from` and `to`, plus optional `event_name` and `tenant_
 
 ## Event processing and delivery
 
-`POST /events` accepts an array of 1–1,000 events, each validated using `EventRequestSchema`. Always send an array, even when it contains one event. The server derives organization, tenant, and API key IDs from the verified API key and adds receipt time and request metadata to every event. It places the batch in a bounded in-memory queue and returns `202`; a background task publishes queued events to `REDPANDA_EVENTS_TOPIC` when the flush size or timer is reached. If the queue is full, the API returns `503` with `Retry-After` so the client can retry.
+`POST /events` accepts an array of 1–1,000 events, each decoded using the `EventIngestionSchema` msgspec type. Always send an array, even when it contains one event. The server derives organization, tenant, and API key IDs from the verified API key and adds receipt time and request metadata to every event. It places the batch in a bounded in-memory queue and returns `202`; the event-buffer flush task publishes queued events to `REDPANDA_EVENTS_TOPIC` when the batch-size or timer threshold is reached. If the queue is full, the API returns `503` with `Retry-After` so the client can retry.
 
 The queue is process memory, not durable storage. A forced process or host crash can lose events that received `202` but had not yet reached Redpanda. Use stable `insert_id` values when retrying requests, and use a durable outbox or queue if accepting events before broker acknowledgement must survive crashes.
 
-The `event-processor` runs `src.vortex.event_processor`. It consumes up to 5,000 records at a time with auto-commit disabled. It validates incoming records, skips malformed records, resolves person and group rows in bulk, and inserts processable events in a PostgreSQL transaction. For a record without a client `insert_id`, it derives a stable UUIDv5 from the topic, partition, and offset so replaying that same broker record does not duplicate its event row. Consumer offsets are committed after successful persistence.
+The `event-processor` runs `python -m src.vortex.worker` (`src/vortex/worker.py`). It consumes up to 5,000 records at a time with auto-commit disabled. It validates incoming records, routes permanent malformed records to the configured dead-letter topic, resolves person and group rows in bulk, and inserts processable events in a PostgreSQL transaction. For a record without a client `insert_id`, it derives a stable UUIDv5 from the topic, partition, and offset so replaying that same broker record does not duplicate its event row. Consumer offsets are committed after successful persistence.
 
 `$identify` updates tenant-scoped mappings from anonymous to known distinct IDs. Ambiguous or cyclic identify links in a batch are skipped; other valid records in the batch can still be processed. Events with a `group_key` resolve a group and link the person to it.
 
@@ -159,15 +160,15 @@ The application Compose file uses the external Docker network `my-redpanda-net`.
 ```bash
 docker network create my-redpanda-net
 docker compose -p redpanda-local -f compose.redpanda.yml up -d
-docker compose up --build -d
+docker compose -f compose.local.yml up --build -d
 ```
 
-The backend Compose stack contains PostgreSQL, Redis, a one-shot Alembic migration service, FastAPI, and the Redpanda event processor. The API, processor, and migration service bind-mount the local source, Alembic directory, and `alembic.ini`, so code and migration edits are visible inside those containers without rebuilding the image. Redpanda is started from its separate Compose file. The backend service targets the broker at `redpanda:19092` over the shared network.
+The backend Compose stack in `compose.local.yml` contains PostgreSQL, Redis, a one-shot Alembic migration service, FastAPI, Nginx, and the Redpanda event processor. Application source is copied into the Docker image by the Dockerfile; rebuild the image after source changes. Redpanda is started from its separate Compose file. The backend service targets the broker at `redpanda:19092` over the shared network. `compose.yml` is empty, so pass `-f compose.local.yml` when invoking the backend stack.
 
 The `vortex_pg_data` named volume keeps PostgreSQL data and the applied Alembic revision across container restarts. Editing or removing local migration files does not erase that database history. After changing a migration, run the one-shot migration service explicitly:
 
 ```bash
-docker compose run --rm migrate
+docker compose -f compose.local.yml run --rm migrate
 ```
 
 Keep a valid Alembic revision chain for any database that already has applied revisions. A new baseline with a different revision ID does not automatically replace the revision stored in PostgreSQL.
@@ -175,7 +176,7 @@ Keep a valid Alembic revision chain for any database that already has applied re
 Useful endpoints: `http://localhost:8000/docs` and `http://localhost:8000/` (Scalar API reference). Follow service logs with:
 
 ```bash
-docker compose logs -f fastapi event-processor
+docker compose -f compose.local.yml logs -f fastapi event-processor
 ```
 
 ### Run the API on the host
@@ -185,13 +186,13 @@ Install Python 3.14, `uv`, and the infrastructure services. From `backend/`, cop
 ```bash
 uv sync --frozen
 uv run alembic upgrade head
-uv run uvicorn src.vortex.main:app --reload --host 0.0.0.0 --port 8000
+uv run granian src.vortex.main:app --interface asgi --host 0.0.0.0 --port 8000 --http 1 --loop uvloop --workers 1
 ```
 
 Run the event processor in another terminal from `backend/`:
 
 ```bash
-uv run python -m src.vortex.event_processor
+uv run python -m src.vortex.worker
 ```
 
 ### Configuration reference
